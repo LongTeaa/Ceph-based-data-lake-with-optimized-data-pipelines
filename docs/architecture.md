@@ -39,3 +39,11 @@ of unstructured data; Spark processes only their metadata.
   VM instances with Ceph deployed using `cephadm`.
 
 The local environment is not used for final Ceph-vs-MinIO performance claims.
+
+## Phase 1 Local Storage
+
+The local Phase 1 backend is MinIO, exposed as an S3-compatible endpoint at
+`http://localhost:9000`. This is a development convenience for validating S3
+scripts and bucket layout. The same bucket and smoke-test scripts are intended
+to run unchanged against Ceph RGW once `S3_ENDPOINT`, `S3_ACCESS_KEY`, and
+`S3_SECRET_KEY` point to a real RGW user.
