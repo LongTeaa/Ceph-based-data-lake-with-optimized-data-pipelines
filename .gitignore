@@ -1,0 +1,103 @@
+# Local environment
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Python cache and tooling
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE / OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and temporary files
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+# Local source datasets
+data/source/*
+!data/source/.gitkeep
+
+# Generated local samples may be committed only when intentionally added
+data/samples/*
+!data/samples/.gitkeep
+!data/samples/README.md
+
+# Pipeline outputs and benchmark artifacts
+data/bronze/*
+data/silver/*
+data/gold/*
+results/*
+benchmark/reports/*
+benchmark/results/*
+!data/bronze/.gitkeep
+!data/silver/.gitkeep
+!data/gold/.gitkeep
+!results/.gitkeep
+!benchmark/reports/.gitkeep
+!benchmark/results/.gitkeep
+
+# Spark / Hadoop / Airflow local state
+spark-warehouse/
+metastore_db/
+derby.log
+airflow.db
+airflow/logs/
+airflow/*.pid
+
+# Docker / service volumes
+docker/volumes/
+volumes/
+minio-data/
+ceph-data/
+prometheus-data/
+grafana-data/
+postgres-data/
+
+# Downloaded or generated data files anywhere in the repo
+*.parquet
+*.csv
+*.jsonl
+*.avro
+*.orc
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.bin
+
+# Keep templates/examples trackable despite broad data ignores
+!*.example
+!*.template
+!**/README.md
+!**/.gitkeep
+
+# Secrets and credentials
+*.pem
+*.key
+*.crt
+*.p12
+credentials.json
+service-account*.json
+aws_credentials
+.aws/
+
+workflow.md
