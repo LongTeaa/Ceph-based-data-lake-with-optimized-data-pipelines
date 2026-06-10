@@ -9,22 +9,26 @@ monitoring. The implementation roadmap is kept locally in `workflow.md`.
 
 ## Current Status
 
-Phase 1 is the active local storage baseline:
+Phase 1 is complete and Phase 2 bronze ingestion is available:
 
 - Repository skeleton exists.
 - Runtime configuration template exists in `.env.example`.
 - Local S3-compatible storage can be started with Docker Compose.
 - Bucket initialization and upload/download/checksum smoke tests are available.
+- NYC Taxi source manifest generation is available.
+- Idempotent bronze upload for manifest-described files is available.
+- Dataset documentation is available in `docs/datasets.md`.
 - Spark, Airflow DAGs, monitoring, and benchmark runners are not implemented yet.
 
 ## Prerequisites
 
-For Phase 1:
+For the current local workflow:
 
 - Git
 - Python 3.11+
 - GNU Make
 - Docker Desktop or Docker Engine with Compose v2
+- One local NYC Taxi Parquet file for bronze ingestion
 
 For later phases:
 
@@ -74,6 +78,13 @@ make storage-smoke
 make health
 ```
 
+Prepare and ingest the default NYC Taxi source file:
+
+```bash
+make prepare-nyc-taxi
+make ingest
+```
+
 Stop local storage:
 
 ```bash
@@ -86,6 +97,8 @@ If `make` is not installed, run the scripts directly:
 python infrastructure/scripts/config_check.py S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY S3_REGION BRONZE_BUCKET SILVER_BUCKET GOLD_BUCKET SYSTEM_BUCKET
 python infrastructure/buckets/init_buckets.py
 python infrastructure/buckets/storage_smoke.py
+python ingestion/nyc_taxi_manifest.py --source-dir data/source/nyc-taxi --file-name yellow_tripdata_2025-01.parquet
+python ingestion/bronze_upload.py --manifest-path data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
 ```
 
 ## Dataset Policy
