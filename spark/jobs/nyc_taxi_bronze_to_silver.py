@@ -65,10 +65,17 @@ def require_pyspark():
 
 
 def get_config_value(name: str, dotenv_values: dict[str, str], default: str = "") -> str:
-    return os.getenv(name) or dotenv_values.get(name, default)
+    return os.getenv(name) or dotenv_values.get(name) or default
 
 
 def configure_s3a(spark, settings) -> None:
+    dotenv_values = load_dotenv()
+    local_dir = get_config_value("SPARK_LOCAL_DIR", dotenv_values, str(PROJECT_ROOT / ".spark-tmp"))
+    local_path = Path(local_dir)
+    if not local_path.is_absolute():
+        local_path = PROJECT_ROOT / local_path
+    local_path.mkdir(parents=True, exist_ok=True)
+
     hadoop_conf = spark.sparkContext._jsc.hadoopConfiguration()
     hadoop_conf.set("fs.s3a.endpoint", settings.endpoint)
     hadoop_conf.set("fs.s3a.access.key", settings.access_key)
@@ -78,6 +85,8 @@ def configure_s3a(spark, settings) -> None:
     hadoop_conf.set("fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
     hadoop_conf.set("fs.s3a.connection.timeout", "10000")
     hadoop_conf.set("fs.s3a.attempts.maximum", "5")
+    hadoop_conf.set("fs.s3a.buffer.dir", str(local_path))
+    hadoop_conf.set("hadoop.tmp.dir", str(local_path))
 
 
 def create_spark_session():
@@ -97,6 +106,17 @@ def create_spark_session():
         dotenv_values,
         str(PROJECT_ROOT / ".spark-ivy"),
     )
+    ivy_path = Path(ivy_dir)
+    if not ivy_path.is_absolute():
+        ivy_dir = str(PROJECT_ROOT / ivy_path)
+    local_dir = get_config_value(
+        "SPARK_LOCAL_DIR",
+        dotenv_values,
+        str(PROJECT_ROOT / ".spark-tmp"),
+    )
+    local_path = Path(local_dir)
+    if not local_path.is_absolute():
+        local_dir = str(PROJECT_ROOT / local_path)
 
     builder = (
         SparkSession.builder.appName(JOB_NAME)
@@ -106,6 +126,7 @@ def create_spark_session():
         .config("spark.sql.shuffle.partitions", shuffle_partitions)
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
         .config("spark.jars.ivy", ivy_dir)
+        .config("spark.local.dir", local_dir)
     )
     if jars_packages:
         builder = builder.config("spark.jars.packages", jars_packages)

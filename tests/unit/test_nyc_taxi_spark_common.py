@@ -4,6 +4,7 @@ import unittest
 
 from spark.jobs.nyc_taxi_common import (
     batch_from_manifest,
+    gold_paths,
     metrics_path,
     missing_required_columns,
     s3_uri,
@@ -63,6 +64,22 @@ class NYCTaxiSparkCommonTests(unittest.TestCase):
             path = metrics_path(Path(tmpdir), "job", "2025", "01")
 
             self.assertEqual(path, Path(tmpdir) / "job" / "year=2025" / "month=01" / "metrics.json")
+
+    def test_gold_paths_builds_expected_output_uris(self):
+        paths = gold_paths("datalake-gold", "2025", "01")
+
+        self.assertEqual(
+            paths.daily_metrics_uri,
+            "s3a://datalake-gold/daily_trip_metrics/year=2025/month=01",
+        )
+        self.assertEqual(
+            paths.location_metrics_uri,
+            "s3a://datalake-gold/location_metrics/year=2025/month=01",
+        )
+        self.assertEqual(
+            paths.payment_metrics_uri,
+            "s3a://datalake-gold/payment_metrics/year=2025/month=01",
+        )
 
 
 if __name__ == "__main__":

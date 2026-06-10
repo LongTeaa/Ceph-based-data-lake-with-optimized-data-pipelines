@@ -36,6 +36,13 @@ class NYCTaxiBatch:
     silver_uri: str
 
 
+@dataclass(frozen=True)
+class NYCTaxiGoldPaths:
+    daily_metrics_uri: str
+    location_metrics_uri: str
+    payment_metrics_uri: str
+
+
 def s3_uri(bucket: str, key: str) -> str:
     normalized_key = key.strip("/")
     if not bucket or not normalized_key:
@@ -82,3 +89,11 @@ def missing_required_columns(columns: Iterable[str]) -> list[str]:
 def metrics_path(output_dir: Path, job_name: str, year: str, month: str) -> Path:
     return output_dir / job_name / f"year={year}" / f"month={month}" / "metrics.json"
 
+
+def gold_paths(gold_bucket: str, year: str, month: str) -> NYCTaxiGoldPaths:
+    partition_suffix = f"year={year}/month={month}"
+    return NYCTaxiGoldPaths(
+        daily_metrics_uri=s3_uri(gold_bucket, f"daily_trip_metrics/{partition_suffix}"),
+        location_metrics_uri=s3_uri(gold_bucket, f"location_metrics/{partition_suffix}"),
+        payment_metrics_uri=s3_uri(gold_bucket, f"payment_metrics/{partition_suffix}"),
+    )

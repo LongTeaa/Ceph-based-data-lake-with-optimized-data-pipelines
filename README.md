@@ -9,8 +9,8 @@ monitoring. The implementation roadmap is kept locally in `workflow.md`.
 
 ## Current Status
 
-Phase 1 is complete, Phase 2 bronze ingestion is available, and Phase 3 has
-started with the NYC Taxi bronze-to-silver Spark job:
+Phase 1 is complete, Phase 2 bronze ingestion is available, and Phase 3 Spark
+ETL is available for NYC Taxi bronze, silver, and gold datasets:
 
 - Repository skeleton exists.
 - Runtime configuration template exists in `.env.example`.
@@ -19,8 +19,9 @@ started with the NYC Taxi bronze-to-silver Spark job:
 - NYC Taxi source manifest generation is available.
 - Idempotent bronze upload for manifest-described files is available.
 - NYC Taxi bronze-to-silver Spark transform is available.
+- NYC Taxi silver-to-gold Spark aggregations are available.
 - Dataset documentation is available in `docs/datasets.md`.
-- Gold transforms, Airflow DAGs, monitoring, and benchmark runners are not implemented yet.
+- Airflow DAGs, monitoring, and benchmark runners are not implemented yet.
 
 ## Prerequisites
 
@@ -87,7 +88,7 @@ make prepare-nyc-taxi
 make ingest
 ```
 
-Transform bronze NYC Taxi data into silver Parquet:
+Transform bronze NYC Taxi data into silver and gold Parquet:
 
 ```bash
 make transform
@@ -108,6 +109,7 @@ python infrastructure/buckets/storage_smoke.py
 python ingestion/nyc_taxi_manifest.py --source-dir data/source/nyc-taxi --file-name yellow_tripdata_2025-01.parquet
 python ingestion/bronze_upload.py --manifest-path data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
 python spark/jobs/nyc_taxi_bronze_to_silver.py --manifest-path data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
+python spark/jobs/nyc_taxi_silver_to_gold.py --manifest-path data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
 ```
 
 ## Dataset Policy
@@ -162,5 +164,5 @@ See [docs/local-storage.md](docs/local-storage.md) for details.
 
 ## Next Phase
 
-Continue Phase 3 by adding the silver-to-gold Spark aggregations and an
-end-to-end smoke test for bronze, silver, and gold.
+Continue by adding an end-to-end smoke test for bronze, silver, and gold, then
+start Phase 4 Airflow orchestration.

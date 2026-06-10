@@ -1,8 +1,8 @@
 # Datasets
 
 Phase 2 prepares source datasets and uploads immutable source files into the
-bronze bucket. Phase 3 starts transforming bronze NYC Taxi data into silver
-Parquet.
+bronze bucket. Phase 3 transforms bronze NYC Taxi data into silver Parquet and
+gold analytics datasets.
 
 ## NYC Yellow Taxi
 
@@ -73,7 +73,8 @@ locks down file provenance, checksum, and bronze object layout.
 
 ## Silver NYC Taxi
 
-Transform the manifest-described bronze file into cleaned silver Parquet:
+Transform the manifest-described bronze file into cleaned silver Parquet and
+gold analytics datasets:
 
 ```bash
 make transform
@@ -100,3 +101,28 @@ The first silver job:
 - drops duplicate trips based on stable trip attributes;
 - adds `pickup_date` and writes partitioned Parquet;
 - writes run metrics under `results/nyc_taxi_bronze_to_silver/`.
+
+## Gold NYC Taxi
+
+Aggregate silver NYC Taxi data into gold datasets:
+
+```bash
+make transform-gold
+```
+
+Expected gold layout:
+
+```text
+s3://datalake-gold/daily_trip_metrics/year=2025/month=01/pickup_date=YYYY-MM-DD/*.parquet
+s3://datalake-gold/location_metrics/year=2025/month=01/pickup_date=YYYY-MM-DD/*.parquet
+s3://datalake-gold/payment_metrics/year=2025/month=01/pickup_date=YYYY-MM-DD/*.parquet
+```
+
+The gold job creates:
+
+- daily trip metrics with trip count, revenue, tips, distance, and passenger
+  averages;
+- pickup/dropoff location metrics with trip count, revenue, and average
+  distance;
+- payment metrics with trip count, revenue, fare, total tip, and average tip;
+- run metrics under `results/nyc_taxi_silver_to_gold/`.
