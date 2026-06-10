@@ -102,6 +102,19 @@ Expected local paths:
 The main analytics dataset is NYC Yellow Taxi. Synthetic data is only for tests,
 scale experiments, and object-storage benchmark payloads.
 
+Prepare and ingest the NYC Taxi source file:
+
+```bash
+make prepare-nyc-taxi
+make ingest
+```
+
+The default source file is `data/source/nyc-taxi/yellow_tripdata_2025-01.parquet`.
+Override `SOURCE`, `FILE`, or `MANIFEST` from the command line when needed.
+
+See [docs/datasets.md](docs/datasets.md) for the expected local path, manifest
+format, and bronze layout.
+
 ## Repository Layout
 
 ```text
@@ -127,5 +140,5 @@ See [docs/local-storage.md](docs/local-storage.md) for details.
 
 ## Next Phase
 
-Phase 2 will prepare NYC Taxi data and ingest source files into the bronze
-bucket.
+Phase 3 will transform bronze NYC Taxi data into silver/gold datasets with
+Spark.

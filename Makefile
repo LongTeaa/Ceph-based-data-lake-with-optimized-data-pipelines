@@ -1,6 +1,9 @@
 .PHONY: help config-check env-check lint test health up down init-buckets storage-smoke generate-test-data prepare-nyc-taxi ingest transform publish query-smoke benchmark-storage benchmark-query e2e-smoke
 
 REQUIRED_ENV := S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY S3_REGION BRONZE_BUCKET SILVER_BUCKET GOLD_BUCKET SYSTEM_BUCKET
+SOURCE ?= data/source/nyc-taxi
+FILE ?= yellow_tripdata_2025-01.parquet
+MANIFEST ?= data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
 
 help:
 	@echo "Ceph-based Data Lake commands"
@@ -19,12 +22,12 @@ config-check:
 env-check: config-check
 
 lint:
-	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
+	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
 
 test:
-	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
+	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
 	@python -m unittest discover -s tests/unit
-	@echo "Phase 1 syntax checks passed."
+	@echo "Phase 2 syntax checks passed."
 
 health: config-check
 	@python infrastructure/buckets/storage_smoke.py --health-only
@@ -45,10 +48,10 @@ generate-test-data:
 	@echo "Not implemented in Phase 0. Planned for Phase 2."
 
 prepare-nyc-taxi:
-	@echo "Not implemented in Phase 0. Planned for Phase 2."
+	@python ingestion/nyc_taxi_manifest.py --source-dir "$(SOURCE)" --file-name "$(FILE)" --manifest-path "$(MANIFEST)"
 
-ingest:
-	@echo "Not implemented in Phase 0. Planned for Phase 2/4."
+ingest: config-check
+	@python ingestion/bronze_upload.py --manifest-path "$(MANIFEST)"
 
 transform:
 	@echo "Not implemented in Phase 0. Planned for Phase 3."
