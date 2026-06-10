@@ -57,6 +57,7 @@ benchmark/results/*
 
 # Spark / Hadoop / Airflow local state
 spark-warehouse/
+.spark-ivy/
 metastore_db/
 derby.log
 airflow.db

@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.append(str(PROJECT_ROOT / "infrastructure" / "buckets"))
+sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "infrastructure" / "buckets"))
 
 from s3_common import load_dotenv, load_settings
 from spark.jobs.nyc_taxi_common import (
@@ -24,6 +25,7 @@ from spark.jobs.nyc_taxi_common import (
 
 
 JOB_NAME = "nyc_taxi_bronze_to_silver"
+DEFAULT_SPARK_JARS_PACKAGES = "org.apache.hadoop:hadoop-aws:3.3.4"
 
 
 def parse_args() -> argparse.Namespace:
@@ -85,6 +87,16 @@ def create_spark_session():
     shuffle_partitions = get_config_value("SPARK_SQL_SHUFFLE_PARTITIONS", dotenv_values, "8")
     driver_memory = get_config_value("SPARK_DRIVER_MEMORY", dotenv_values, "2g")
     executor_memory = get_config_value("SPARK_EXECUTOR_MEMORY", dotenv_values, "2g")
+    jars_packages = get_config_value(
+        "SPARK_JARS_PACKAGES",
+        dotenv_values,
+        DEFAULT_SPARK_JARS_PACKAGES,
+    )
+    ivy_dir = get_config_value(
+        "SPARK_IVY_DIR",
+        dotenv_values,
+        str(PROJECT_ROOT / ".spark-ivy"),
+    )
 
     builder = (
         SparkSession.builder.appName(JOB_NAME)
@@ -93,7 +105,10 @@ def create_spark_session():
         .config("spark.executor.memory", executor_memory)
         .config("spark.sql.shuffle.partitions", shuffle_partitions)
         .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
+        .config("spark.jars.ivy", ivy_dir)
     )
+    if jars_packages:
+        builder = builder.config("spark.jars.packages", jars_packages)
     return builder.getOrCreate()
 
 
