@@ -4,6 +4,8 @@ REQUIRED_ENV := S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY S3_REGION BRONZE_BUCKET 
 SOURCE ?= data/source/nyc-taxi
 FILE ?= yellow_tripdata_2025-01.parquet
 MANIFEST ?= data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
+OUTPUT_DIR ?= results
+TRANSFORM_MODE ?= overwrite
 
 help:
 	@echo "Ceph-based Data Lake commands"
@@ -13,8 +15,9 @@ help:
 	@echo "  make storage-smoke      Upload/download/checksum smoke test"
 	@echo "  make health             Check S3 endpoint reachability"
 	@echo "  make test               Run available tests"
-	@echo "  make prepare-nyc-taxi   Placeholder for Phase 2"
-	@echo "  make ingest             Placeholder for later phases"
+	@echo "  make prepare-nyc-taxi   Create NYC Taxi source manifest"
+	@echo "  make ingest             Upload manifest-described files to bronze"
+	@echo "  make transform          Transform NYC Taxi bronze data to silver"
 
 config-check:
 	@python infrastructure/scripts/config_check.py $(REQUIRED_ENV)
@@ -22,12 +25,12 @@ config-check:
 env-check: config-check
 
 lint:
-	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
+	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
 
 test:
-	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
+	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
 	@python -m unittest discover -s tests/unit
-	@echo "Phase 2 syntax checks passed."
+	@echo "Available syntax and unit checks passed."
 
 health: config-check
 	@python infrastructure/buckets/storage_smoke.py --health-only
@@ -53,8 +56,8 @@ prepare-nyc-taxi:
 ingest: config-check
 	@python ingestion/bronze_upload.py --manifest-path "$(MANIFEST)"
 
-transform:
-	@echo "Not implemented in Phase 0. Planned for Phase 3."
+transform: config-check
+	@python spark/jobs/nyc_taxi_bronze_to_silver.py --manifest-path "$(MANIFEST)" --output-dir "$(OUTPUT_DIR)" --mode "$(TRANSFORM_MODE)"
 
 publish:
 	@echo "Not implemented in Phase 0. Planned for Phase 3/4."

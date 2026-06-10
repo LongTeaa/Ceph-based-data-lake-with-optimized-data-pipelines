@@ -1,7 +1,8 @@
 # Datasets
 
 Phase 2 prepares source datasets and uploads immutable source files into the
-bronze bucket.
+bronze bucket. Phase 3 starts transforming bronze NYC Taxi data into silver
+Parquet.
 
 ## NYC Yellow Taxi
 
@@ -69,3 +70,33 @@ exists with different content, the script fails unless you intentionally pass
 
 Row count and schema inspection are deferred to the Spark phase. Phase 2 only
 locks down file provenance, checksum, and bronze object layout.
+
+## Silver NYC Taxi
+
+Transform the manifest-described bronze file into cleaned silver Parquet:
+
+```bash
+make transform
+```
+
+To transform a specific manifest:
+
+```bash
+make transform MANIFEST=data/source/nyc-taxi/manifests/yellow_tripdata_2025-02.manifest.json
+```
+
+Expected silver layout:
+
+```text
+s3://datalake-silver/nyc-taxi/year=2025/month=01/pickup_date=YYYY-MM-DD/*.parquet
+```
+
+The first silver job:
+
+- reads the source Parquet object recorded in the manifest;
+- casts key columns to timestamp, integer, and double types;
+- renames pickup/dropoff location columns to snake case;
+- removes trips with invalid timestamps, negative distance, or negative amounts;
+- drops duplicate trips based on stable trip attributes;
+- adds `pickup_date` and writes partitioned Parquet;
+- writes run metrics under `results/nyc_taxi_bronze_to_silver/`.

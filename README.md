@@ -9,7 +9,8 @@ monitoring. The implementation roadmap is kept locally in `workflow.md`.
 
 ## Current Status
 
-Phase 1 is complete and Phase 2 bronze ingestion is available:
+Phase 1 is complete, Phase 2 bronze ingestion is available, and Phase 3 has
+started with the NYC Taxi bronze-to-silver Spark job:
 
 - Repository skeleton exists.
 - Runtime configuration template exists in `.env.example`.
@@ -17,8 +18,9 @@ Phase 1 is complete and Phase 2 bronze ingestion is available:
 - Bucket initialization and upload/download/checksum smoke tests are available.
 - NYC Taxi source manifest generation is available.
 - Idempotent bronze upload for manifest-described files is available.
+- NYC Taxi bronze-to-silver Spark transform is available.
 - Dataset documentation is available in `docs/datasets.md`.
-- Spark, Airflow DAGs, monitoring, and benchmark runners are not implemented yet.
+- Gold transforms, Airflow DAGs, monitoring, and benchmark runners are not implemented yet.
 
 ## Prerequisites
 
@@ -85,6 +87,12 @@ make prepare-nyc-taxi
 make ingest
 ```
 
+Transform bronze NYC Taxi data into silver Parquet:
+
+```bash
+make transform
+```
+
 Stop local storage:
 
 ```bash
@@ -99,6 +107,7 @@ python infrastructure/buckets/init_buckets.py
 python infrastructure/buckets/storage_smoke.py
 python ingestion/nyc_taxi_manifest.py --source-dir data/source/nyc-taxi --file-name yellow_tripdata_2025-01.parquet
 python ingestion/bronze_upload.py --manifest-path data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
+python spark/jobs/nyc_taxi_bronze_to_silver.py --manifest-path data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
 ```
 
 ## Dataset Policy
@@ -153,5 +162,5 @@ See [docs/local-storage.md](docs/local-storage.md) for details.
 
 ## Next Phase
 
-Phase 3 will transform bronze NYC Taxi data into silver/gold datasets with
-Spark.
+Continue Phase 3 by adding the silver-to-gold Spark aggregations and an
+end-to-end smoke test for bronze, silver, and gold.
