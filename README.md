@@ -125,6 +125,12 @@ Run Spark SQL smoke queries against the silver/gold datasets:
 make query-smoke
 ```
 
+Run a small Spark SQL query benchmark:
+
+```bash
+make benchmark-query QUERY_BENCHMARK_WARMUP=0 QUERY_BENCHMARK_ITERATIONS=1
+```
+
 Stop local storage:
 
 ```bash
@@ -209,8 +215,9 @@ network settings, and validation order.
 ## Query Layer
 
 Phase 5 starts with Spark SQL smoke queries over NYC Taxi silver/gold Parquet
-outputs. See [docs/query.md](docs/query.md) for the query set, run command, and
-result metrics.
+outputs and a lightweight Spark SQL benchmark runner. See
+[docs/query.md](docs/query.md) for the query set, run commands, and result
+metrics.
 
 ## Next Phase
 

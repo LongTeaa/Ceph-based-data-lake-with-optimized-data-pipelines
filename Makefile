@@ -6,6 +6,10 @@ FILE ?= yellow_tripdata_2025-01.parquet
 MANIFEST ?= data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
 OUTPUT_DIR ?= results
 TRANSFORM_MODE ?= overwrite
+QUERY_BENCHMARK_ITERATIONS ?= 3
+QUERY_BENCHMARK_WARMUP ?= 1
+QUERY_BENCHMARK_OUTPUT_DIR ?= benchmark/results
+BENCHMARK_RUN_ID ?= local-baseline
 
 help:
 	@echo "Ceph-based Data Lake commands"
@@ -27,6 +31,7 @@ help:
 	@echo "  make transform-silver   Transform NYC Taxi bronze data to silver"
 	@echo "  make transform-gold     Aggregate NYC Taxi silver data to gold"
 	@echo "  make query-smoke        Run Spark SQL smoke queries on NYC Taxi silver/gold"
+	@echo "  make benchmark-query    Benchmark Spark SQL queries on NYC Taxi silver/gold"
 	@echo "  make dag-check          Validate Airflow DAG source files"
 
 config-check:
@@ -35,10 +40,10 @@ config-check:
 env-check: config-check
 
 lint:
-	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
+	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
 
 test:
-	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
+	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
 	@python -m unittest discover -s tests/unit
 	@echo "Available syntax and unit checks passed."
 
@@ -114,7 +119,7 @@ benchmark-storage:
 	@echo "Not implemented in Phase 0. Planned for Phase 7."
 
 benchmark-query:
-	@echo "Not implemented in Phase 0. Planned for Phase 8."
+	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_sql_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_BENCHMARK_WARMUP)'"
 
 e2e-smoke:
 	@echo "Not implemented in Phase 0. Planned after storage and Spark are available."

@@ -63,6 +63,40 @@ views, executes every `.sql` file under `spark/sql/`, and writes metrics to:
 results/nyc_taxi_query_smoke/year=YYYY/month=MM/metrics.json
 ```
 
+## Benchmark
+
+Run the Spark SQL benchmark:
+
+```bash
+make benchmark-query
+```
+
+By default this runs one warm-up pass and three measured iterations for every
+query. On a small local machine, reduce the work:
+
+```bash
+make benchmark-query QUERY_BENCHMARK_WARMUP=0 QUERY_BENCHMARK_ITERATIONS=1
+```
+
+Benchmark outputs are written under:
+
+```text
+benchmark/results/<run_id>/query/spark_sql/<timestamp>/
+```
+
+Each run directory contains:
+
+```text
+environment.json
+scenario.json
+raw-results.jsonl
+summary.csv
+summary.json
+```
+
+`raw-results.jsonl` keeps one record per query execution. `summary.csv`
+contains per-query min, median, p95, and max durations for measured runs.
+
 ## Runtime Notes
 
 `make query-smoke` runs through the Docker Compose `spark-submit` service and
@@ -92,6 +126,9 @@ Each query metric includes:
 The selective date query is the one to use when explaining partition pruning:
 it filters `silver_trips` by `pickup_date`, which matches the silver Parquet
 partition column.
+
+Use `query-smoke` to prove correctness quickly. Use `benchmark-query` when you
+need repeated measurements for reports or later comparisons.
 
 ## Trino
 
