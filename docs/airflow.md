@@ -1,6 +1,7 @@
 # Airflow Orchestration
 
-Phase 4 starts with a manual-trigger DAG for the NYC Taxi Data Lake pipeline.
+Phase 4 starts with a manual-trigger DAG and local Docker Compose services for
+the NYC Taxi Data Lake pipeline.
 
 ## DAG
 
@@ -27,6 +28,79 @@ check_config
 
 The DAG only orchestrates existing scripts and Spark jobs. ETL logic remains in
 the `ingestion/` and `spark/jobs/` modules.
+
+## Local Docker Runtime
+
+Start MinIO, Postgres, Airflow webserver, and Airflow scheduler:
+
+```bash
+make airflow-up
+```
+
+Open the Airflow UI:
+
+```text
+http://localhost:8080
+```
+
+Default local credentials from `.env.example`:
+
+```text
+username: admin
+password: admin
+```
+
+List loaded DAGs from the webserver container:
+
+```bash
+make airflow-dag-list
+```
+
+Follow scheduler and webserver logs:
+
+```bash
+make airflow-logs
+```
+
+Stop Airflow services:
+
+```bash
+make airflow-down
+```
+
+The Compose runtime uses:
+
+- `postgres` for Airflow metadata;
+- `airflow-init` to migrate the metadata database and create the admin user;
+- `airflow-webserver` for the UI;
+- `airflow-scheduler` to schedule and execute DAG tasks;
+- `minio` as the local S3-compatible object storage.
+
+The Airflow containers install lightweight runtime dependencies from:
+
+```text
+docker/airflow/requirements.txt
+```
+
+This keeps webserver and scheduler startup quick. Spark execution inside
+Airflow will need either a Spark-capable Airflow image or a separate Spark
+cluster submission path before the transform tasks are run from the UI.
+
+The Airflow containers mount the repository at:
+
+```text
+/opt/airflow/project
+```
+
+They also override `S3_ENDPOINT` to:
+
+```text
+http://minio:9000
+```
+
+This is different from host-local `.env` values such as
+`http://localhost:9000`, because containers must reach MinIO by service name on
+the Compose network.
 
 ## Runtime Assumptions
 
@@ -79,3 +153,22 @@ Run all local checks:
 ```bash
 make test
 ```
+
+## Manual Trigger
+
+After `make airflow-up`, open the Airflow UI, unpause
+`nyc_taxi_data_lake_pipeline`, and trigger it manually. The default parameters
+process:
+
+```text
+data/source/nyc-taxi/yellow_tripdata_2025-01.parquet
+```
+
+Before triggering the DAG, make sure buckets exist:
+
+```bash
+make init-buckets
+```
+
+When running inside Docker, the DAG uses the environment variables injected by
+Compose, while the scripts still read `.env` as a fallback.

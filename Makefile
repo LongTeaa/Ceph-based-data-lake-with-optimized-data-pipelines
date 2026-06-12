@@ -1,4 +1,4 @@
-.PHONY: help config-check env-check lint test dag-check health up down init-buckets storage-smoke generate-test-data prepare-nyc-taxi ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query e2e-smoke
+.PHONY: help config-check env-check lint test dag-check health up down airflow-up airflow-down airflow-logs airflow-dag-list init-buckets storage-smoke generate-test-data prepare-nyc-taxi ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query e2e-smoke
 
 REQUIRED_ENV := S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY S3_REGION BRONZE_BUCKET SILVER_BUCKET GOLD_BUCKET SYSTEM_BUCKET
 SOURCE ?= data/source/nyc-taxi
@@ -11,6 +11,9 @@ help:
 	@echo "Ceph-based Data Lake commands"
 	@echo "  make config-check       Validate required environment variables"
 	@echo "  make up                 Start local S3-compatible storage"
+	@echo "  make airflow-up         Start local Airflow services"
+	@echo "  make airflow-down       Stop local Airflow services"
+	@echo "  make airflow-dag-list   List Airflow DAGs in the webserver container"
 	@echo "  make init-buckets       Create Data Lake buckets"
 	@echo "  make storage-smoke      Upload/download/checksum smoke test"
 	@echo "  make health             Check S3 endpoint reachability"
@@ -46,6 +49,18 @@ up:
 
 down:
 	@docker compose -f docker/compose.yml down
+
+airflow-up:
+	@docker compose -f docker/compose.yml up -d minio postgres airflow-init airflow-webserver airflow-scheduler
+
+airflow-down:
+	@docker compose -f docker/compose.yml stop airflow-scheduler airflow-webserver postgres
+
+airflow-logs:
+	@docker compose -f docker/compose.yml logs -f airflow-scheduler airflow-webserver
+
+airflow-dag-list:
+	@docker compose -f docker/compose.yml exec airflow-webserver airflow dags list
 
 init-buckets: config-check
 	@python infrastructure/buckets/init_buckets.py

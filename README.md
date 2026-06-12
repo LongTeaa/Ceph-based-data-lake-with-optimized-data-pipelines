@@ -85,6 +85,14 @@ make storage-smoke
 make health
 ```
 
+Start local Airflow services when you want to orchestrate the pipeline through
+the Airflow UI:
+
+```bash
+make airflow-up
+make airflow-dag-list
+```
+
 Prepare and ingest the default NYC Taxi source file:
 
 ```bash
@@ -165,6 +173,12 @@ development backend for validating bucket layout and S3 scripts. The same
 scripts are intended to run against Ceph RGW after changing `.env`.
 
 See [docs/local-storage.md](docs/local-storage.md) for details.
+
+## Airflow
+
+Phase 4 includes a manual-trigger DAG for the NYC Taxi pipeline and local
+Airflow services in Docker Compose. See [docs/airflow.md](docs/airflow.md) for
+startup, credentials, parameters, and runtime notes.
 
 ## Next Phase
 
