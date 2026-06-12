@@ -11,7 +11,7 @@ monitoring. The implementation roadmap is kept locally in `workflow.md`.
 
 Phase 1 is complete, Phase 2 bronze ingestion is available, Phase 3 Spark ETL
 is available for NYC Taxi bronze, silver, and gold datasets, and Phase 4 has
-started with a manual Airflow orchestration DAG:
+started with Airflow orchestration plus local Spark standalone services:
 
 - Repository skeleton exists.
 - Runtime configuration template exists in `.env.example`.
@@ -23,8 +23,10 @@ started with a manual Airflow orchestration DAG:
 - NYC Taxi silver-to-gold Spark aggregations are available.
 - A manual-trigger Airflow DAG orchestrates config check, storage check,
   bronze ingest, silver transform, and gold transform.
+- Local Airflow services are available in Docker Compose.
+- Local Spark standalone master/worker services are available in Docker Compose.
 - Dataset documentation is available in `docs/datasets.md`.
-- Airflow service containers, monitoring, and benchmark runners are not implemented yet.
+- Monitoring and benchmark runners are not implemented yet.
 
 ## Prerequisites
 
@@ -91,6 +93,15 @@ the Airflow UI:
 ```bash
 make airflow-up
 make airflow-dag-list
+```
+
+Start local Spark standalone services when you want Spark master/worker instead
+of `local[*]`:
+
+```bash
+make spark-up
+make spark-submit-silver
+make spark-submit-gold
 ```
 
 Prepare and ingest the default NYC Taxi source file:
@@ -180,7 +191,13 @@ Phase 4 includes a manual-trigger DAG for the NYC Taxi pipeline and local
 Airflow services in Docker Compose. See [docs/airflow.md](docs/airflow.md) for
 startup, credentials, parameters, and runtime notes.
 
+## Spark Standalone
+
+Phase 4 includes a local Spark master/worker runtime in Docker Compose. See
+[docs/spark.md](docs/spark.md) for startup commands, submit targets, container
+network settings, and validation order.
+
 ## Next Phase
 
-Continue Phase 4 by adding local Airflow service containers, then add an
-end-to-end smoke test for bronze, silver, gold, and DAG import.
+Continue Phase 4 by validating Spark standalone submits, then update the
+Airflow DAG to submit Spark jobs to the standalone cluster.

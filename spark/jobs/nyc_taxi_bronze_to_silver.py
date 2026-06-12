@@ -89,7 +89,7 @@ def configure_s3a(spark, settings) -> None:
     hadoop_conf.set("hadoop.tmp.dir", str(local_path))
 
 
-def create_spark_session():
+def create_spark_session(app_name: str = JOB_NAME):
     SparkSession, _, _, _, _ = require_pyspark()
     dotenv_values = load_dotenv()
     master_url = get_config_value("SPARK_MASTER_URL", dotenv_values, "local[*]")
@@ -119,7 +119,7 @@ def create_spark_session():
         local_dir = str(PROJECT_ROOT / local_path)
 
     builder = (
-        SparkSession.builder.appName(JOB_NAME)
+        SparkSession.builder.appName(app_name)
         .master(master_url)
         .config("spark.driver.memory", driver_memory)
         .config("spark.executor.memory", executor_memory)

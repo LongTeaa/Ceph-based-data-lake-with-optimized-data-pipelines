@@ -1,4 +1,4 @@
-.PHONY: help config-check env-check lint test dag-check health up down airflow-up airflow-down airflow-logs airflow-dag-list init-buckets storage-smoke generate-test-data prepare-nyc-taxi ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query e2e-smoke
+.PHONY: help config-check env-check lint test dag-check health up down airflow-up airflow-down airflow-logs airflow-dag-list spark-up spark-down spark-logs spark-submit-silver spark-submit-gold init-buckets storage-smoke generate-test-data prepare-nyc-taxi ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query e2e-smoke
 
 REQUIRED_ENV := S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY S3_REGION BRONZE_BUCKET SILVER_BUCKET GOLD_BUCKET SYSTEM_BUCKET
 SOURCE ?= data/source/nyc-taxi
@@ -14,6 +14,9 @@ help:
 	@echo "  make airflow-up         Start local Airflow services"
 	@echo "  make airflow-down       Stop local Airflow services"
 	@echo "  make airflow-dag-list   List Airflow DAGs in the webserver container"
+	@echo "  make spark-up           Start local Spark standalone services"
+	@echo "  make spark-submit-silver Submit bronze-to-silver job to Spark standalone"
+	@echo "  make spark-submit-gold  Submit silver-to-gold job to Spark standalone"
 	@echo "  make init-buckets       Create Data Lake buckets"
 	@echo "  make storage-smoke      Upload/download/checksum smoke test"
 	@echo "  make health             Check S3 endpoint reachability"
@@ -61,6 +64,21 @@ airflow-logs:
 
 airflow-dag-list:
 	@docker compose -f docker/compose.yml exec airflow-webserver airflow dags list
+
+spark-up:
+	@docker compose -f docker/compose.yml up -d minio spark-master spark-worker
+
+spark-down:
+	@docker compose -f docker/compose.yml stop spark-worker spark-master
+
+spark-logs:
+	@docker compose -f docker/compose.yml logs -f spark-master spark-worker
+
+spark-submit-silver:
+	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 spark/jobs/nyc_taxi_bronze_to_silver.py --manifest-path '$(MANIFEST)' --output-dir '$(OUTPUT_DIR)' --mode '$(TRANSFORM_MODE)'"
+
+spark-submit-gold:
+	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 spark/jobs/nyc_taxi_silver_to_gold.py --manifest-path '$(MANIFEST)' --output-dir '$(OUTPUT_DIR)' --mode '$(TRANSFORM_MODE)'"
 
 init-buckets: config-check
 	@python infrastructure/buckets/init_buckets.py

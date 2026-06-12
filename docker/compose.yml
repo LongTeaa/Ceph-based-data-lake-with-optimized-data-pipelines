@@ -121,6 +121,105 @@ services:
       timeout: 10s
       retries: 5
 
+  spark-master:
+    image: ${SPARK_IMAGE:-ceph-data-lake-spark:3.5.1}
+    build:
+      context: ..
+      dockerfile: docker/spark/Dockerfile
+    container_name: ceph-data-lake-spark-master
+    user: root
+    environment: &spark-common-env
+      SPARK_MODE: master
+      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
+      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
+      SPARK_SSL_ENABLED: "no"
+      SPARK_MASTER_URL: spark://spark-master:7077
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin123}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_PATH_STYLE_ACCESS: ${S3_PATH_STYLE_ACCESS:-true}
+      S3_USE_SSL: ${S3_USE_SSL:-false}
+      BRONZE_BUCKET: ${BRONZE_BUCKET:-datalake-bronze}
+      SILVER_BUCKET: ${SILVER_BUCKET:-datalake-silver}
+      GOLD_BUCKET: ${GOLD_BUCKET:-datalake-gold}
+      SYSTEM_BUCKET: ${SYSTEM_BUCKET:-datalake-system}
+      SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-2g}
+      SPARK_EXECUTOR_MEMORY: ${SPARK_EXECUTOR_MEMORY:-2g}
+      SPARK_SQL_SHUFFLE_PARTITIONS: ${SPARK_SQL_SHUFFLE_PARTITIONS:-8}
+      SPARK_JARS_PACKAGES: ${SPARK_JARS_PACKAGES:-org.apache.hadoop:hadoop-aws:3.3.4}
+      SPARK_IVY_DIR: /tmp/spark-ivy
+      SPARK_LOCAL_DIR: /tmp/spark-local
+    ports:
+      - "7077:7077"
+      - "8081:8080"
+    volumes: &spark-common-volumes
+      - ..:/opt/spark/project
+      - spark-ivy:/tmp/spark-ivy
+      - spark-local:/tmp/spark-local
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+      --host spark-master
+      --port 7077
+      --webui-port 8080
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec ':</dev/tcp/spark-master/7077'"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+
+  spark-worker:
+    image: ${SPARK_IMAGE:-ceph-data-lake-spark:3.5.1}
+    build:
+      context: ..
+      dockerfile: docker/spark/Dockerfile
+    container_name: ceph-data-lake-spark-worker
+    user: root
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    environment:
+      <<: *spark-common-env
+      SPARK_MODE: worker
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-2}
+      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-2g}
+    ports:
+      - "8082:8081"
+    volumes: *spark-common-volumes
+    command: >
+      /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker
+      spark://spark-master:7077
+      --webui-port 8081
+      --cores ${SPARK_WORKER_CORES:-2}
+      --memory ${SPARK_WORKER_MEMORY:-2g}
+
+  spark-submit:
+    image: ${SPARK_IMAGE:-ceph-data-lake-spark:3.5.1}
+    build:
+      context: ..
+      dockerfile: docker/spark/Dockerfile
+    container_name: ceph-data-lake-spark-submit
+    user: root
+    profiles: ["tools"]
+    depends_on:
+      spark-master:
+        condition: service_healthy
+      spark-worker:
+        condition: service_started
+      minio:
+        condition: service_started
+    environment:
+      <<: *spark-common-env
+      SPARK_MODE: client
+      SPARK_MASTER_URL: spark://spark-master:7077
+    working_dir: /opt/spark/project
+    volumes: *spark-common-volumes
+    entrypoint: ["/bin/bash", "-lc"]
+
 volumes:
   minio-data:
   postgres-data:
+  spark-ivy:
+  spark-local:

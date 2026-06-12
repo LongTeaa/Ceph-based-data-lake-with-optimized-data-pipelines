@@ -126,7 +126,7 @@ def run_transform(manifest_path: Path, output_dir: Path, mode: str) -> dict[str,
     batch = batch_from_manifest(manifest, settings.silver_bucket)
     paths = gold_paths(settings.gold_bucket, batch.year, batch.month)
 
-    spark = create_spark_session()
+    spark = create_spark_session(JOB_NAME)
     try:
         configure_s3a(spark, settings)
         silver_df = spark.read.parquet(batch.silver_uri)

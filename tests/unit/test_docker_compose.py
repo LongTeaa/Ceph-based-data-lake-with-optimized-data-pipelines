@@ -14,6 +14,9 @@ class DockerComposeSourceTests(unittest.TestCase):
             "airflow-init:",
             "airflow-webserver:",
             "airflow-scheduler:",
+            "spark-master:",
+            "spark-worker:",
+            "spark-submit:",
         ]:
             self.assertIn(service, source)
 
@@ -32,6 +35,16 @@ class DockerComposeSourceTests(unittest.TestCase):
             '_PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/project/docker/airflow/requirements.txt"',
             source,
         )
+
+    def test_spark_standalone_services_are_configured_for_minio(self):
+        source = COMPOSE_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("SPARK_MODE: master", source)
+        self.assertIn("SPARK_MODE: worker", source)
+        self.assertIn("SPARK_MASTER_URL: spark://spark-master:7077", source)
+        self.assertIn("S3_ENDPOINT: http://minio:9000", source)
+        self.assertIn("- ..:/opt/spark/project", source)
+        self.assertIn("dockerfile: docker/spark/Dockerfile", source)
 
 
 if __name__ == "__main__":
