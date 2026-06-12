@@ -10,8 +10,8 @@ monitoring. The implementation roadmap is kept locally in `workflow.md`.
 ## Current Status
 
 Phase 1 is complete, Phase 2 bronze ingestion is available, Phase 3 Spark ETL
-is available for NYC Taxi bronze, silver, and gold datasets, and Phase 4 has
-started with Airflow orchestration plus local Spark standalone services:
+is available for NYC Taxi bronze, silver, and gold datasets, and Phase 4 has a
+manual Airflow DAG that submits transform jobs to local Spark standalone:
 
 - Repository skeleton exists.
 - Runtime configuration template exists in `.env.example`.
@@ -22,7 +22,7 @@ started with Airflow orchestration plus local Spark standalone services:
 - NYC Taxi bronze-to-silver Spark transform is available.
 - NYC Taxi silver-to-gold Spark aggregations are available.
 - A manual-trigger Airflow DAG orchestrates config check, storage check,
-  bronze ingest, silver transform, and gold transform.
+  bronze ingest, silver transform, and gold transform through Spark standalone.
 - Local Airflow services are available in Docker Compose.
 - Local Spark standalone master/worker services are available in Docker Compose.
 - Dataset documentation is available in `docs/datasets.md`.
@@ -88,7 +88,7 @@ make health
 ```
 
 Start local Airflow services when you want to orchestrate the pipeline through
-the Airflow UI:
+the Airflow UI. This also starts Spark master/worker for transform tasks:
 
 ```bash
 make airflow-up
@@ -188,8 +188,9 @@ See [docs/local-storage.md](docs/local-storage.md) for details.
 ## Airflow
 
 Phase 4 includes a manual-trigger DAG for the NYC Taxi pipeline and local
-Airflow services in Docker Compose. See [docs/airflow.md](docs/airflow.md) for
-startup, credentials, parameters, and runtime notes.
+Airflow services in Docker Compose. The transform tasks use `spark-submit` to
+run on Spark standalone. See [docs/airflow.md](docs/airflow.md) for startup,
+credentials, parameters, and runtime notes.
 
 ## Spark Standalone
 
@@ -199,5 +200,5 @@ network settings, and validation order.
 
 ## Next Phase
 
-Continue Phase 4 by validating Spark standalone submits, then update the
-Airflow DAG to submit Spark jobs to the standalone cluster.
+Move to the next roadmap phase: add a query/analytics layer and smoke queries
+against the gold datasets.

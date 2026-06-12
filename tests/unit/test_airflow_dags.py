@@ -26,6 +26,9 @@ class AirflowDagSourceTests(unittest.TestCase):
             "infrastructure/buckets/storage_smoke.py --health-only",
             "ingestion/nyc_taxi_manifest.py",
             "ingestion/bronze_upload.py",
+            "spark-submit",
+            "--master",
+            "spark://spark-master:7077",
             "spark/jobs/nyc_taxi_bronze_to_silver.py",
             "spark/jobs/nyc_taxi_silver_to_gold.py",
         ]:

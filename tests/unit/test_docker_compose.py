@@ -28,13 +28,13 @@ class DockerComposeSourceTests(unittest.TestCase):
         self.assertIn("DATA_LAKE_PROJECT_ROOT: /opt/airflow/project", source)
         self.assertIn("S3_ENDPOINT: http://minio:9000", source)
 
-    def test_airflow_uses_project_requirements(self):
+    def test_airflow_uses_project_image_with_spark_client(self):
         source = COMPOSE_PATH.read_text(encoding="utf-8")
 
-        self.assertIn(
-            '_PIP_ADDITIONAL_REQUIREMENTS: "-r /opt/airflow/project/docker/airflow/requirements.txt"',
-            source,
-        )
+        self.assertIn("image: ${AIRFLOW_IMAGE:-ceph-data-lake-airflow:2.9.3-python3.11}", source)
+        self.assertIn("dockerfile: docker/airflow/Dockerfile", source)
+        self.assertIn("DATA_LAKE_SPARK_SUBMIT_BIN: spark-submit", source)
+        self.assertIn("SPARK_IVY_DIR: /opt/airflow/project/.spark-ivy", source)
 
     def test_spark_standalone_services_are_configured_for_minio(self):
         source = COMPOSE_PATH.read_text(encoding="utf-8")

@@ -31,7 +31,8 @@ the `ingestion/` and `spark/jobs/` modules.
 
 ## Local Docker Runtime
 
-Start MinIO, Postgres, Airflow webserver, and Airflow scheduler:
+Start MinIO, Postgres, Spark master/worker, Airflow webserver, and Airflow
+scheduler:
 
 ```bash
 make airflow-up
@@ -76,15 +77,21 @@ The Compose runtime uses:
 - `airflow-scheduler` to schedule and execute DAG tasks;
 - `minio` as the local S3-compatible object storage.
 
-The Airflow containers install lightweight runtime dependencies from:
+The Airflow image is built from:
+
+```text
+docker/airflow/Dockerfile
+```
+
+It installs Java plus the Python dependencies from:
 
 ```text
 docker/airflow/requirements.txt
 ```
 
-This keeps webserver and scheduler startup quick. Spark execution inside
-Airflow will need either a Spark-capable Airflow image or a separate Spark
-cluster submission path before the transform tasks are run from the UI.
+This gives the webserver and scheduler a Spark client. The transform tasks use
+`spark-submit --master spark://spark-master:7077` and run on the Spark
+master/worker services.
 
 The Airflow containers mount the repository at:
 
@@ -102,21 +109,34 @@ This is different from host-local `.env` values such as
 `http://localhost:9000`, because containers must reach MinIO by service name on
 the Compose network.
 
+The Airflow containers also set:
+
+```text
+SPARK_MASTER_URL=spark://spark-master:7077
+SPARK_IVY_DIR=/opt/airflow/project/.spark-ivy
+SPARK_LOCAL_DIR=/opt/airflow/project/.spark-tmp
+```
+
+so `bronze_to_silver` and `silver_to_gold` submit to Spark standalone instead
+of using local PySpark mode.
+
 ## Runtime Assumptions
 
 The Airflow environment must:
 
 - mount this repository into the container or host path configured by
   `DATA_LAKE_PROJECT_ROOT`;
-- run with dependencies from `requirements.txt`;
+- run with dependencies from `docker/airflow/requirements.txt`;
 - have access to the same `.env` values used by the local scripts;
-- reach the S3-compatible endpoint configured by `S3_ENDPOINT`.
+- reach the S3-compatible endpoint configured by `S3_ENDPOINT`;
+- reach the Spark master configured by `SPARK_MASTER_URL`.
 
 For a local Airflow container, set:
 
 ```env
 DATA_LAKE_PROJECT_ROOT=/opt/airflow/project
 DATA_LAKE_PYTHON_BIN=python
+DATA_LAKE_SPARK_SUBMIT_BIN=spark-submit
 ```
 
 If running Airflow directly from the repository virtual environment on Windows,

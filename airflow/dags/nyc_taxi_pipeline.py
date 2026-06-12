@@ -10,6 +10,10 @@ from airflow.operators.bash import BashOperator
 
 PROJECT_ROOT = "${DATA_LAKE_PROJECT_ROOT:-/opt/airflow/project}"
 PYTHON_BIN = "${DATA_LAKE_PYTHON_BIN:-python}"
+SPARK_SUBMIT_BIN = "${DATA_LAKE_SPARK_SUBMIT_BIN:-spark-submit}"
+SPARK_MASTER_URL = "${SPARK_MASTER_URL:-spark://spark-master:7077}"
+SPARK_IVY_DIR = "${SPARK_IVY_DIR:-/tmp/spark-ivy}"
+SPARK_JARS_PACKAGES = "${SPARK_JARS_PACKAGES:-org.apache.hadoop:hadoop-aws:3.3.4}"
 
 DEFAULT_SOURCE_DIR = "data/source/nyc-taxi"
 DEFAULT_FILE_NAME = "yellow_tripdata_2025-01.parquet"
@@ -22,6 +26,21 @@ DEFAULT_TRANSFORM_MODE = "overwrite"
 
 def project_command(command: str) -> str:
     return f'cd "{PROJECT_ROOT}" && {command}'
+
+
+def spark_submit_command(job_path: str) -> str:
+    return project_command(
+        "mkdir -p "
+        f'"{SPARK_IVY_DIR}/cache" "{SPARK_IVY_DIR}/jars" /tmp/spark-local && '
+        f"{SPARK_SUBMIT_BIN} "
+        f"--master {SPARK_MASTER_URL} "
+        f"--conf spark.jars.ivy={SPARK_IVY_DIR} "
+        f"--packages {SPARK_JARS_PACKAGES} "
+        f"{job_path} "
+        '--manifest-path "{{ params.manifest_path }}" '
+        '--output-dir "{{ params.output_dir }}" '
+        '--mode "{{ params.transform_mode }}"'
+    )
 
 
 with DAG(
@@ -81,23 +100,13 @@ with DAG(
 
     bronze_to_silver = BashOperator(
         task_id="bronze_to_silver",
-        bash_command=project_command(
-            f"{PYTHON_BIN} spark/jobs/nyc_taxi_bronze_to_silver.py "
-            '--manifest-path "{{ params.manifest_path }}" '
-            '--output-dir "{{ params.output_dir }}" '
-            '--mode "{{ params.transform_mode }}"'
-        ),
+        bash_command=spark_submit_command("spark/jobs/nyc_taxi_bronze_to_silver.py"),
         execution_timeout=timedelta(hours=2),
     )
 
     silver_to_gold = BashOperator(
         task_id="silver_to_gold",
-        bash_command=project_command(
-            f"{PYTHON_BIN} spark/jobs/nyc_taxi_silver_to_gold.py "
-            '--manifest-path "{{ params.manifest_path }}" '
-            '--output-dir "{{ params.output_dir }}" '
-            '--mode "{{ params.transform_mode }}"'
-        ),
+        bash_command=spark_submit_command("spark/jobs/nyc_taxi_silver_to_gold.py"),
         execution_timeout=timedelta(hours=2),
     )
 

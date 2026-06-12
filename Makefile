@@ -54,7 +54,7 @@ down:
 	@docker compose -f docker/compose.yml down
 
 airflow-up:
-	@docker compose -f docker/compose.yml up -d minio postgres airflow-init airflow-webserver airflow-scheduler
+	@docker compose -f docker/compose.yml up -d minio postgres spark-master spark-worker airflow-init airflow-webserver airflow-scheduler
 
 airflow-down:
 	@docker compose -f docker/compose.yml stop airflow-scheduler airflow-webserver postgres

@@ -96,7 +96,7 @@ SPARK_MASTER_URL=local[*]
 
 ## Recommended Validation Order
 
-Before connecting Spark standalone to Airflow, validate it directly:
+Validate Spark standalone directly first:
 
 ```bash
 make spark-up
@@ -107,8 +107,15 @@ make spark-submit-silver
 make spark-submit-gold
 ```
 
-After both submit targets pass, update the Airflow DAG to submit jobs to Spark
-standalone instead of running PySpark directly inside Airflow.
+After both submit targets pass, start Airflow:
+
+```bash
+make airflow-up
+```
+
+The Airflow image includes a Spark client, so the DAG transform tasks call
+`spark-submit --master spark://spark-master:7077` and run the applications on
+the same `spark-master`/`spark-worker` services.
 
 ## Notes
 
