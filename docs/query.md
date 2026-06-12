@@ -142,6 +142,43 @@ Register the NYC Taxi gold tables and run smoke queries:
 make trino-smoke
 ```
 
+Run the Trino benchmark:
+
+```bash
+make benchmark-trino
+```
+
+By default this runs one warm-up pass and three measured iterations for every
+Trino benchmark query. On a small local machine, reduce the work:
+
+```bash
+make benchmark-trino TRINO_BENCHMARK_WARMUP=0 TRINO_BENCHMARK_ITERATIONS=1
+```
+
+Benchmark outputs are written under:
+
+```text
+benchmark/results/<run_id>/query/trino/<timestamp>/
+```
+
+Each run directory contains:
+
+```text
+environment.json
+scenario.json
+raw-results.jsonl
+summary.csv
+summary.json
+```
+
+The Trino benchmark currently focuses on the gold tables:
+
+```text
+docker/trino/sql/benchmark/01_daily_revenue.sql
+docker/trino/sql/benchmark/02_top_pickup_locations.sql
+docker/trino/sql/benchmark/03_avg_tip_by_payment.sql
+```
+
 The setup SQL is:
 
 ```text
@@ -215,6 +252,5 @@ need repeated measurements for reports or later comparisons.
 
 Useful next extensions:
 
-- add Trino benchmark output comparable to Spark SQL benchmark results;
 - register selected silver tables in Trino for partition-pruning demos;
 - add BI or notebook access after the SQL engine is stable.

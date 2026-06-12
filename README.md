@@ -140,6 +140,12 @@ make trino-up
 make trino-smoke
 ```
 
+Run a small Trino query benchmark:
+
+```bash
+make benchmark-trino TRINO_BENCHMARK_WARMUP=0 TRINO_BENCHMARK_ITERATIONS=1
+```
+
 Open an interactive Trino CLI:
 
 ```bash
@@ -231,8 +237,9 @@ network settings, and validation order.
 
 Phase 5 starts with Spark SQL smoke queries over NYC Taxi silver/gold Parquet
 outputs, a lightweight Spark SQL benchmark runner, and Trino external tables
-over the gold layer. See [docs/query.md](docs/query.md) for the query set, run
-commands, result metrics, and Trino usage.
+over the gold layer with a Trino benchmark runner. See
+[docs/query.md](docs/query.md) for the query set, run commands, result metrics,
+and Trino usage.
 
 ## Next Phase
 
