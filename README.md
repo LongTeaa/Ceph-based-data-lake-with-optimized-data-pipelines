@@ -10,8 +10,9 @@ monitoring. The implementation roadmap is kept locally in `workflow.md`.
 ## Current Status
 
 Phase 1 is complete, Phase 2 bronze ingestion is available, Phase 3 Spark ETL
-is available for NYC Taxi bronze, silver, and gold datasets, and Phase 4 has a
-manual Airflow DAG that submits transform jobs to local Spark standalone:
+is available for NYC Taxi bronze, silver, and gold datasets, Phase 4 has a
+manual Airflow DAG that submits transform jobs to local Spark standalone, and
+Phase 5 has started with Spark SQL smoke queries:
 
 - Repository skeleton exists.
 - Runtime configuration template exists in `.env.example`.
@@ -25,6 +26,7 @@ manual Airflow DAG that submits transform jobs to local Spark standalone:
   bronze ingest, silver transform, and gold transform through Spark standalone.
 - Local Airflow services are available in Docker Compose.
 - Local Spark standalone master/worker services are available in Docker Compose.
+- Spark SQL smoke queries are available for NYC Taxi silver/gold outputs.
 - Dataset documentation is available in `docs/datasets.md`.
 - Monitoring and benchmark runners are not implemented yet.
 
@@ -117,6 +119,12 @@ Transform bronze NYC Taxi data into silver and gold Parquet:
 make transform
 ```
 
+Run Spark SQL smoke queries against the silver/gold datasets:
+
+```bash
+make query-smoke
+```
+
 Stop local storage:
 
 ```bash
@@ -198,7 +206,12 @@ Phase 4 includes a local Spark master/worker runtime in Docker Compose. See
 [docs/spark.md](docs/spark.md) for startup commands, submit targets, container
 network settings, and validation order.
 
+## Query Layer
+
+Phase 5 starts with Spark SQL smoke queries over NYC Taxi silver/gold Parquet
+outputs. See [docs/query.md](docs/query.md) for the query set, run command, and
+result metrics.
+
 ## Next Phase
 
-Move to the next roadmap phase: add a query/analytics layer and smoke queries
-against the gold datasets.
+Extend Phase 5 with Trino after the Spark SQL query baseline is stable.
