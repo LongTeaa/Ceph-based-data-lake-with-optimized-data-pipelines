@@ -9,8 +9,9 @@ monitoring. The implementation roadmap is kept locally in `workflow.md`.
 
 ## Current Status
 
-Phase 1 is complete, Phase 2 bronze ingestion is available, and Phase 3 Spark
-ETL is available for NYC Taxi bronze, silver, and gold datasets:
+Phase 1 is complete, Phase 2 bronze ingestion is available, Phase 3 Spark ETL
+is available for NYC Taxi bronze, silver, and gold datasets, and Phase 4 has
+started with a manual Airflow orchestration DAG:
 
 - Repository skeleton exists.
 - Runtime configuration template exists in `.env.example`.
@@ -20,8 +21,10 @@ ETL is available for NYC Taxi bronze, silver, and gold datasets:
 - Idempotent bronze upload for manifest-described files is available.
 - NYC Taxi bronze-to-silver Spark transform is available.
 - NYC Taxi silver-to-gold Spark aggregations are available.
+- A manual-trigger Airflow DAG orchestrates config check, storage check,
+  bronze ingest, silver transform, and gold transform.
 - Dataset documentation is available in `docs/datasets.md`.
-- Airflow DAGs, monitoring, and benchmark runners are not implemented yet.
+- Airflow service containers, monitoring, and benchmark runners are not implemented yet.
 
 ## Prerequisites
 
@@ -70,6 +73,7 @@ Run local checks:
 
 ```bash
 make test
+make dag-check
 ```
 
 Start local S3-compatible storage, create buckets, and run a smoke test:
@@ -164,5 +168,5 @@ See [docs/local-storage.md](docs/local-storage.md) for details.
 
 ## Next Phase
 
-Continue by adding an end-to-end smoke test for bronze, silver, and gold, then
-start Phase 4 Airflow orchestration.
+Continue Phase 4 by adding local Airflow service containers, then add an
+end-to-end smoke test for bronze, silver, gold, and DAG import.
