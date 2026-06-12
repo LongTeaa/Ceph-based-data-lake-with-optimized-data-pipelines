@@ -90,7 +90,7 @@ SPARK_MASTER_URL=spark://spark-master:7077
 This differs from host-local runs, where `.env` may use:
 
 ```text
-S3_ENDPOINT=http://localhost:9000
+S3_ENDPOINT=http://localhost:19000
 SPARK_MASTER_URL=local[*]
 ```
 

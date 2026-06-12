@@ -106,7 +106,7 @@ http://minio:9000
 ```
 
 This is different from host-local `.env` values such as
-`http://localhost:9000`, because containers must reach MinIO by service name on
+`http://localhost:19000`, because containers must reach MinIO by service name on
 the Compose network.
 
 The Airflow containers also set:

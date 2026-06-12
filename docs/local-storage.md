@@ -22,8 +22,8 @@ make up
 
 The default local endpoints are:
 
-- S3 API: `http://localhost:9000`
-- Console: `http://localhost:9001`
+- S3 API: `http://localhost:19000`
+- Console: `http://localhost:19001`
 
 Default local credentials are defined in `.env.example`:
 
