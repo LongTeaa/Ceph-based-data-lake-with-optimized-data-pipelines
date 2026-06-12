@@ -12,7 +12,8 @@ monitoring. The implementation roadmap is kept locally in `workflow.md`.
 Phase 1 is complete, Phase 2 bronze ingestion is available, Phase 3 Spark ETL
 is available for NYC Taxi bronze, silver, and gold datasets, Phase 4 has a
 manual Airflow DAG that submits transform jobs to local Spark standalone, and
-Phase 5 has started with Spark SQL smoke queries:
+Phase 5 has a query layer with Spark SQL smoke/benchmark queries and an
+optional Trino service for SQL analytics over gold Parquet:
 
 - Repository skeleton exists.
 - Runtime configuration template exists in `.env.example`.
@@ -27,6 +28,7 @@ Phase 5 has started with Spark SQL smoke queries:
 - Local Airflow services are available in Docker Compose.
 - Local Spark standalone master/worker services are available in Docker Compose.
 - Spark SQL smoke queries are available for NYC Taxi silver/gold outputs.
+- Trino can register and query NYC Taxi gold Parquet tables from MinIO.
 - Dataset documentation is available in `docs/datasets.md`.
 - Monitoring and benchmark runners are not implemented yet.
 
@@ -131,6 +133,19 @@ Run a small Spark SQL query benchmark:
 make benchmark-query QUERY_BENCHMARK_WARMUP=0 QUERY_BENCHMARK_ITERATIONS=1
 ```
 
+Start Trino and run SQL smoke queries against gold tables:
+
+```bash
+make trino-up
+make trino-smoke
+```
+
+Open an interactive Trino CLI:
+
+```bash
+make trino-cli
+```
+
 Stop local storage:
 
 ```bash
@@ -215,10 +230,11 @@ network settings, and validation order.
 ## Query Layer
 
 Phase 5 starts with Spark SQL smoke queries over NYC Taxi silver/gold Parquet
-outputs and a lightweight Spark SQL benchmark runner. See
-[docs/query.md](docs/query.md) for the query set, run commands, and result
-metrics.
+outputs, a lightweight Spark SQL benchmark runner, and Trino external tables
+over the gold layer. See [docs/query.md](docs/query.md) for the query set, run
+commands, result metrics, and Trino usage.
 
 ## Next Phase
 
-Extend Phase 5 with Trino after the Spark SQL query baseline is stable.
+Continue Phase 5 by expanding Trino benchmark coverage or start Phase 6
+monitoring with Prometheus/Grafana.

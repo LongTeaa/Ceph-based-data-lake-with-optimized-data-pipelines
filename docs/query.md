@@ -3,9 +3,9 @@
 Phase 5 starts with Spark SQL smoke queries over the NYC Taxi silver and gold
 Parquet datasets stored in S3-compatible object storage.
 
-The first implementation intentionally uses Spark SQL before adding Trino. This
-matches the project workflow: establish a stable query baseline first, then add
-Trino later when the local environment has enough disk and memory headroom.
+The first implementation used Spark SQL to establish a stable query baseline.
+The phase now also includes a lightweight Trino service for SQL analytics over
+gold Parquet data in MinIO.
 
 ## Query Set
 
@@ -114,6 +114,87 @@ S3_ENDPOINT=http://localhost:19000
 SPARK_MASTER_URL=local[*]
 ```
 
+## Trino
+
+Trino is the interactive SQL query service for Phase 5. It is separate from
+Spark:
+
+```text
+Spark SQL smoke/benchmark  -> correctness and baseline timings
+Trino                      -> analytics SQL service over gold Parquet
+```
+
+Start MinIO and Trino:
+
+```bash
+make trino-up
+```
+
+The Trino UI is available at:
+
+```text
+http://localhost:8083
+```
+
+Register the NYC Taxi gold tables and run smoke queries:
+
+```bash
+make trino-smoke
+```
+
+The setup SQL is:
+
+```text
+docker/trino/sql/nyc_taxi_gold_setup.sql
+```
+
+It creates an external Hive catalog schema and registers these gold tables:
+
+```text
+lake.nyc_taxi.daily_trip_metrics
+lake.nyc_taxi.location_metrics
+lake.nyc_taxi.payment_metrics
+```
+
+The smoke SQL is:
+
+```text
+docker/trino/sql/nyc_taxi_gold_smoke.sql
+```
+
+Open an interactive SQL shell:
+
+```bash
+make trino-cli
+```
+
+Example query:
+
+```sql
+SELECT pickup_date, trip_count, total_revenue
+FROM daily_trip_metrics
+ORDER BY pickup_date
+LIMIT 10;
+```
+
+Trino uses the Docker internal S3 endpoint:
+
+```text
+http://minio:9000
+```
+
+The host browser still opens MinIO at:
+
+```text
+http://localhost:19001
+```
+
+This initial Trino setup uses the Hive connector with a file metastore stored
+in a Docker volume. It avoids adding a separate Hive Metastore container while
+still allowing external tables over Parquet objects in MinIO. The first Trino
+scope intentionally focuses on the gold layer because those tables are smaller,
+stable, and ready for analytics.
+
 ## Interpreting Results
 
 Each query metric includes:
@@ -130,7 +211,10 @@ partition column.
 Use `query-smoke` to prove correctness quickly. Use `benchmark-query` when you
 need repeated measurements for reports or later comparisons.
 
-## Trino
+## Next Query Extensions
 
-Trino remains a later Phase 5 extension. Add it after the Spark SQL baseline is
-stable and local disk pressure is under control.
+Useful next extensions:
+
+- add Trino benchmark output comparable to Spark SQL benchmark results;
+- register selected silver tables in Trino for partition-pruning demos;
+- add BI or notebook access after the SQL engine is stable.

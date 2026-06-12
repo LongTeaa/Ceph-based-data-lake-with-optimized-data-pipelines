@@ -227,8 +227,34 @@ services:
     volumes: *spark-common-volumes
     entrypoint: ["/bin/bash", "-lc"]
 
+  trino:
+    image: ${TRINO_IMAGE:-trinodb/trino:455}
+    container_name: ceph-data-lake-trino
+    user: root
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin123}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_PATH_STYLE_ACCESS: ${S3_PATH_STYLE_ACCESS:-true}
+      S3_USE_SSL: ${S3_USE_SSL:-false}
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog:ro
+      - ./trino/sql:/etc/trino/sql:ro
+      - trino-metastore:/var/trino/hive-metastore
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8080/v1/info || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+
 volumes:
   minio-data:
   postgres-data:
   spark-ivy:
   spark-local:
+  trino-metastore:

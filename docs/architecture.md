@@ -14,7 +14,8 @@ Local source datasets
     -> silver bucket
     -> Spark aggregation
     -> gold bucket
-    -> Spark SQL / Trino query benchmark
+    -> Spark SQL smoke/benchmark
+    -> Trino SQL analytics
 ```
 
 ## Storage Layers
