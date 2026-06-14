@@ -97,6 +97,53 @@ summary.json
 `raw-results.jsonl` keeps one record per query execution. `summary.csv`
 contains per-query min, median, p95, and max durations for measured runs.
 
+## Layout Benchmark
+
+Phase 8 starts by comparing the same silver Parquet data in two layouts:
+
+```text
+partitioned by pickup_date
+non-partitioned Parquet
+```
+
+Run a small layout benchmark:
+
+```bash
+make benchmark-query-layout QUERY_LAYOUT_BENCHMARK_WARMUP=0 QUERY_LAYOUT_BENCHMARK_ITERATIONS=1
+```
+
+The runner reads the existing partitioned silver dataset, writes a temporary
+non-partitioned copy under the system bucket, and executes the same silver-only
+queries against both layouts:
+
+```text
+spark/sql/04_hourly_distance_fare.sql
+spark/sql/05_selective_pickup_date.sql
+spark/sql/06_full_scan_location_aggregation.sql
+```
+
+Outputs are written under:
+
+```text
+benchmark/results/<run_id>/query/spark_layout/<timestamp>/
+```
+
+Each run contains:
+
+```text
+environment.json
+scenario.json
+raw-results.jsonl
+summary.csv
+summary.json
+notes.json
+```
+
+`summary.csv` groups results by `layout` and `query_name`, and includes a
+`result_consistent` column. The runner hashes each query result so the report can
+show that the partitioned and non-partitioned layouts returned equivalent
+answers before comparing timings.
+
 ## Runtime Notes
 
 `make query-smoke` runs through the Docker Compose `spark-submit` service and

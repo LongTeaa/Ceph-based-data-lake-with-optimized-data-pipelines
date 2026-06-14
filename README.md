@@ -136,6 +136,12 @@ Run a small Spark SQL query benchmark:
 make benchmark-query QUERY_BENCHMARK_WARMUP=0 QUERY_BENCHMARK_ITERATIONS=1
 ```
 
+Compare partitioned and non-partitioned silver Parquet layouts:
+
+```bash
+make benchmark-query-layout QUERY_LAYOUT_BENCHMARK_WARMUP=0 QUERY_LAYOUT_BENCHMARK_ITERATIONS=1
+```
+
 Start Trino and run SQL smoke queries against gold tables:
 
 ```bash
@@ -280,5 +286,5 @@ scenario parameters, and output format.
 
 ## Next Phase
 
-Continue by running a fuller Phase 7 matrix against Ceph RGW, or start Phase 8
-query optimization comparisons now that local baseline metrics can be observed.
+Continue Phase 8 by adding CSV/Parquet and small-file compaction comparisons, or
+run the existing layout benchmark against a larger NYC Taxi dataset.
