@@ -148,6 +148,12 @@ Compare small-file and compacted silver Parquet layouts:
 make benchmark-query-compaction QUERY_LAYOUT_BENCHMARK_WARMUP=0 QUERY_LAYOUT_BENCHMARK_ITERATIONS=1
 ```
 
+Compare CSV and Parquet silver layouts:
+
+```bash
+make benchmark-query-format QUERY_LAYOUT_BENCHMARK_WARMUP=0 QUERY_LAYOUT_BENCHMARK_ITERATIONS=1
+```
+
 Start Trino and run SQL smoke queries against gold tables:
 
 ```bash
@@ -292,5 +298,5 @@ scenario parameters, and output format.
 
 ## Next Phase
 
-Continue Phase 8 by adding CSV/Parquet comparisons, or run the existing layout
-and compaction benchmarks against a larger NYC Taxi dataset.
+Continue Phase 8 by running the layout, compaction, and format benchmarks with
+more iterations or against a larger NYC Taxi dataset.

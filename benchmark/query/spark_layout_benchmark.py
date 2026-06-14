@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare Spark SQL query performance across NYC Taxi Parquet layouts."""
+"""Compare Spark SQL query performance across NYC Taxi silver data layouts."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ DEFAULT_SQL_FILES = (
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Benchmark partitioned vs non-partitioned NYC Taxi Parquet layouts.")
+    parser = argparse.ArgumentParser(description="Benchmark NYC Taxi silver data layouts.")
     parser.add_argument("--manifest-path", required=True)
     parser.add_argument("--output-dir", default="benchmark/results")
     parser.add_argument("--run-id", default=os.getenv("BENCHMARK_RUN_ID", "local-baseline"))
@@ -45,9 +45,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--warmup", type=int, default=1)
     parser.add_argument(
         "--comparison",
-        choices=("partition", "compaction"),
+        choices=("partition", "compaction", "format"),
         default="partition",
-        help="Comparison to run: partitioned vs non-partitioned, or small-files vs compacted.",
+        help="Comparison to run: partitioned vs non-partitioned, small-files vs compacted, or CSV vs Parquet.",
     )
     parser.add_argument(
         "--coalesce",
@@ -60,7 +60,7 @@ def parse_args() -> argparse.Namespace:
         default=",".join(str(path) for path in DEFAULT_SQL_FILES),
         help="Comma-separated SQL files that only depend on the silver_trips view.",
     )
-    parser.add_argument("--keep-layout", action="store_true", help="Keep generated non-partitioned layout objects.")
+    parser.add_argument("--keep-layout", action="store_true", help="Keep generated benchmark layout objects.")
     return parser.parse_args()
 
 
@@ -183,6 +183,14 @@ def cleanup_s3_prefix(spark, uri: str) -> None:
         filesystem.delete(path, True)
 
 
+def read_layout(spark, uri: str, data_format: str, schema):
+    if data_format == "parquet":
+        return spark.read.parquet(uri)
+    if data_format == "csv":
+        return spark.read.option("header", "true").schema(schema).csv(uri)
+    raise ValueError(f"unsupported layout format: {data_format}")
+
+
 def build_layout_specs(
     spark,
     source_df,
@@ -194,7 +202,7 @@ def build_layout_specs(
     partitioned_uri: str,
     comparison: str,
     coalesce: int,
-) -> tuple[list[tuple[str, str]], list[str], dict[str, str]]:
+) -> tuple[list[tuple[str, str, str]], list[str], dict[str, str]]:
     base_prefix = f"benchmark-layouts/{run_id}/{run_started_at}"
     if comparison == "partition":
         non_partitioned_uri = s3_uri(
@@ -206,11 +214,34 @@ def build_layout_specs(
         output_df.write.mode("overwrite").parquet(non_partitioned_uri)
         return (
             [
-                ("partitioned", partitioned_uri),
-                ("non_partitioned", non_partitioned_uri),
+                ("partitioned", partitioned_uri, "parquet"),
+                ("non_partitioned", non_partitioned_uri, "parquet"),
             ],
             [non_partitioned_uri],
             {"partitioned_uri": partitioned_uri, "non_partitioned_uri": non_partitioned_uri},
+        )
+
+    if comparison == "format":
+        parquet_uri = s3_uri(
+            system_bucket,
+            f"{base_prefix}/silver_format_parquet/year={year}/month={month}",
+        )
+        csv_uri = s3_uri(
+            system_bucket,
+            f"{base_prefix}/silver_format_csv/year={year}/month={month}",
+        )
+        cleanup_s3_prefix(spark, parquet_uri)
+        cleanup_s3_prefix(spark, csv_uri)
+        output_df = source_df if coalesce == 0 else source_df.coalesce(coalesce)
+        output_df.write.mode("overwrite").parquet(parquet_uri)
+        output_df.write.mode("overwrite").option("header", "true").csv(csv_uri)
+        return (
+            [
+                ("parquet", parquet_uri, "parquet"),
+                ("csv", csv_uri, "csv"),
+            ],
+            [parquet_uri, csv_uri],
+            {"parquet_uri": parquet_uri, "csv_uri": csv_uri},
         )
 
     if coalesce <= 0:
@@ -230,8 +261,8 @@ def build_layout_specs(
     source_df.coalesce(coalesce).write.mode("overwrite").parquet(compacted_uri)
     return (
         [
-            ("small_files", small_files_uri),
-            ("compacted", compacted_uri),
+            ("small_files", small_files_uri, "parquet"),
+            ("compacted", compacted_uri, "parquet"),
         ],
         [small_files_uri, compacted_uri],
         {"small_files_uri": small_files_uri, "compacted_uri": compacted_uri},
@@ -320,8 +351,9 @@ def benchmark_layouts(
         write_json(run_dir / "scenario.json", scenario)
         write_json(run_dir / "environment.json", environment)
 
-        for layout_name, layout_uri in layouts:
-            silver_df = spark.read.parquet(layout_uri)
+        silver_schema = partitioned_df.schema
+        for layout_name, layout_uri, layout_format in layouts:
+            silver_df = read_layout(spark, layout_uri, layout_format, silver_schema)
             silver_df.createOrReplaceTempView("silver_trips")
             for phase, phase_iterations in [("warmup", warmup), ("measured", iterations)]:
                 for iteration in range(1, phase_iterations + 1):
@@ -332,6 +364,7 @@ def benchmark_layouts(
                             "phase": phase,
                             "layout": layout_name,
                             "layout_uri": layout_uri,
+                            "layout_format": layout_format,
                             "iteration": iteration,
                             "query_name": query_path.stem,
                             "query_file": str(query_path.relative_to(PROJECT_ROOT)),

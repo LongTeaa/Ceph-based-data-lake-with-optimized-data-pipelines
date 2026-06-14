@@ -1,7 +1,13 @@
 from decimal import Decimal
 import unittest
 
-from benchmark.query.spark_layout_benchmark import benchmark_layouts, normalize_row, parse_sql_files, summarize_results
+from benchmark.query.spark_layout_benchmark import (
+    benchmark_layouts,
+    normalize_row,
+    parse_sql_files,
+    read_layout,
+    summarize_results,
+)
 
 
 class SparkLayoutBenchmarkTests(unittest.TestCase):
@@ -90,6 +96,10 @@ class SparkLayoutBenchmarkTests(unittest.TestCase):
                 coalesce=0,
                 keep_layout=False,
             )
+
+    def test_read_layout_rejects_unknown_format(self):
+        with self.assertRaises(ValueError):
+            read_layout(None, "s3a://bucket/path", "json", None)
 
 
 if __name__ == "__main__":

@@ -170,6 +170,25 @@ The query set and output schema are the same as the partition layout benchmark.
 Use this comparison to explain the trade-off between many small Parquet files
 and fewer compacted files on S3-compatible object storage.
 
+The runner can also compare CSV and Parquet using the same logical silver rows:
+
+```bash
+make benchmark-query-format QUERY_LAYOUT_BENCHMARK_WARMUP=0 QUERY_LAYOUT_BENCHMARK_ITERATIONS=1
+```
+
+This mode writes two temporary non-partitioned copies:
+
+```text
+parquet
+csv
+```
+
+The CSV reader uses the original silver schema when loading the generated CSV
+copy, so query results remain comparable with the Parquet copy. Use this
+comparison to show why Parquet is usually preferred for silver and gold tables:
+it is columnar, typed, and typically faster for analytical scans than row-based
+CSV text files.
+
 ## Runtime Notes
 
 `make query-smoke` runs through the Docker Compose `spark-submit` service and
