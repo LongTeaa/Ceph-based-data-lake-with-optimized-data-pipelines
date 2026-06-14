@@ -149,6 +149,18 @@ Run a small Trino query benchmark:
 make benchmark-trino TRINO_BENCHMARK_WARMUP=0 TRINO_BENCHMARK_ITERATIONS=1
 ```
 
+Run a lightweight S3-compatible storage benchmark:
+
+```bash
+make benchmark-storage
+```
+
+Use a one-operation smoke benchmark on small machines:
+
+```bash
+make benchmark-storage STORAGE_BENCHMARK_OBJECT_SIZES=4KiB STORAGE_BENCHMARK_CONCURRENCY=1 STORAGE_BENCHMARK_OPERATIONS=put STORAGE_BENCHMARK_WARMUP=0 STORAGE_BENCHMARK_ITERATIONS=1
+```
+
 Start local monitoring dashboards:
 
 ```bash
@@ -259,7 +271,14 @@ Phase 6 includes local Prometheus/Grafana provisioning for MinIO, Spark, and
 Airflow metrics. See [docs/monitoring.md](docs/monitoring.md) for startup
 commands, endpoints, dashboard details, and current Trino/Ceph limitations.
 
+## Storage Benchmark
+
+Phase 7 includes a boto3-based S3 PUT/GET/mixed benchmark runner with warm-up,
+concurrency, checksum validation, raw JSONL output, and CSV/JSON summaries. See
+[docs/storage-benchmark.md](docs/storage-benchmark.md) for run commands,
+scenario parameters, and output format.
+
 ## Next Phase
 
-Continue with Phase 7 storage benchmarking, or expand Phase 8 query optimization
-benchmarks now that local baseline metrics can be observed.
+Continue by running a fuller Phase 7 matrix against Ceph RGW, or start Phase 8
+query optimization comparisons now that local baseline metrics can be observed.

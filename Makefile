@@ -13,6 +13,13 @@ BENCHMARK_RUN_ID ?= local-baseline
 TRINO_BENCHMARK_ITERATIONS ?= 3
 TRINO_BENCHMARK_WARMUP ?= 1
 TRINO_BENCHMARK_OUTPUT_DIR ?= benchmark/results
+STORAGE_BENCHMARK_OUTPUT_DIR ?= benchmark/results
+STORAGE_BENCHMARK_BACKEND ?= local-s3
+STORAGE_BENCHMARK_OBJECT_SIZES ?= 4KiB,1MiB
+STORAGE_BENCHMARK_CONCURRENCY ?= 1,4
+STORAGE_BENCHMARK_OPERATIONS ?= put,get,mixed
+STORAGE_BENCHMARK_ITERATIONS ?= 10
+STORAGE_BENCHMARK_WARMUP ?= 2
 
 help:
 	@echo "Ceph-based Data Lake commands"
@@ -41,6 +48,7 @@ help:
 	@echo "  make query-smoke        Run Spark SQL smoke queries on NYC Taxi silver/gold"
 	@echo "  make benchmark-query    Benchmark Spark SQL queries on NYC Taxi silver/gold"
 	@echo "  make benchmark-trino    Benchmark Trino queries on NYC Taxi gold"
+	@echo "  make benchmark-storage  Benchmark S3-compatible PUT/GET/mixed workloads"
 	@echo "  make dag-check          Validate Airflow DAG source files"
 
 config-check:
@@ -49,10 +57,10 @@ config-check:
 env-check: config-check
 
 lint:
-	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','benchmark/query/trino_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
+	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','benchmark/query/trino_benchmark.py','benchmark/storage/s3_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
 
 test:
-	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','benchmark/query/trino_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
+	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','benchmark/query/trino_benchmark.py','benchmark/storage/s3_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
 	@python -m unittest discover -s tests/unit
 	@echo "Available syntax and unit checks passed."
 
@@ -152,7 +160,7 @@ query-smoke:
 	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 spark/jobs/nyc_taxi_query_smoke.py --manifest-path '$(MANIFEST)' --output-dir '$(OUTPUT_DIR)'"
 
 benchmark-storage:
-	@echo "Not implemented in Phase 0. Planned for Phase 7."
+	@python benchmark/storage/s3_benchmark.py --output-dir "$(STORAGE_BENCHMARK_OUTPUT_DIR)" --run-id "$(BENCHMARK_RUN_ID)" --backend "$(STORAGE_BENCHMARK_BACKEND)" --object-sizes "$(STORAGE_BENCHMARK_OBJECT_SIZES)" --concurrency "$(STORAGE_BENCHMARK_CONCURRENCY)" --operations "$(STORAGE_BENCHMARK_OPERATIONS)" --iterations "$(STORAGE_BENCHMARK_ITERATIONS)" --warmup "$(STORAGE_BENCHMARK_WARMUP)"
 
 benchmark-query:
 	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_sql_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_BENCHMARK_WARMUP)'"
