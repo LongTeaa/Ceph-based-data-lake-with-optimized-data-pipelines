@@ -13,7 +13,8 @@ Phase 1 is complete, Phase 2 bronze ingestion is available, Phase 3 Spark ETL
 is available for NYC Taxi bronze, silver, and gold datasets, Phase 4 has a
 manual Airflow DAG that submits transform jobs to local Spark standalone, and
 Phase 5 has a query layer with Spark SQL smoke/benchmark queries and an
-optional Trino service for SQL analytics over gold Parquet:
+optional Trino service for SQL analytics over gold Parquet, and Phase 6 has
+local Prometheus/Grafana monitoring for MinIO, Spark, and Airflow metrics:
 
 - Repository skeleton exists.
 - Runtime configuration template exists in `.env.example`.
@@ -29,8 +30,10 @@ optional Trino service for SQL analytics over gold Parquet:
 - Local Spark standalone master/worker services are available in Docker Compose.
 - Spark SQL smoke queries are available for NYC Taxi silver/gold outputs.
 - Trino can register and query NYC Taxi gold Parquet tables from MinIO.
+- Prometheus and Grafana can be started locally with provisioned scrape config,
+  datasource, and dashboard files.
 - Dataset documentation is available in `docs/datasets.md`.
-- Monitoring and benchmark runners are not implemented yet.
+- Storage benchmark runner is not implemented yet.
 
 ## Prerequisites
 
@@ -146,6 +149,15 @@ Run a small Trino query benchmark:
 make benchmark-trino TRINO_BENCHMARK_WARMUP=0 TRINO_BENCHMARK_ITERATIONS=1
 ```
 
+Start local monitoring dashboards:
+
+```bash
+make monitoring-up
+```
+
+Prometheus is available at <http://localhost:9090>. Grafana is available at
+<http://localhost:3000> with the default local credentials from `.env`.
+
 Open an interactive Trino CLI:
 
 ```bash
@@ -241,7 +253,13 @@ over the gold layer with a Trino benchmark runner. See
 [docs/query.md](docs/query.md) for the query set, run commands, result metrics,
 and Trino usage.
 
+## Monitoring
+
+Phase 6 includes local Prometheus/Grafana provisioning for MinIO, Spark, and
+Airflow metrics. See [docs/monitoring.md](docs/monitoring.md) for startup
+commands, endpoints, dashboard details, and current Trino/Ceph limitations.
+
 ## Next Phase
 
-Continue Phase 5 by expanding Trino benchmark coverage or start Phase 6
-monitoring with Prometheus/Grafana.
+Continue with Phase 7 storage benchmarking, or expand Phase 8 query optimization
+benchmarks now that local baseline metrics can be observed.

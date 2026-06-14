@@ -1,0 +1,7 @@
+mappings:
+  - match: "airflow.*.*"
+    name: "airflow_${1}_${2}"
+  - match: "airflow.*.*.*"
+    name: "airflow_${1}_${2}_${3}"
+  - match: "airflow.*.*.*.*"
+    name: "airflow_${1}_${2}_${3}_${4}"

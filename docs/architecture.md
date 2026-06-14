@@ -16,6 +16,7 @@ Local source datasets
     -> gold bucket
     -> Spark SQL smoke/benchmark
     -> Trino SQL analytics
+    -> Prometheus/Grafana monitoring
 ```
 
 ## Storage Layers
@@ -40,6 +41,17 @@ of unstructured data; Spark processes only their metadata.
   VM instances with Ceph deployed using `cephadm`.
 
 The local environment is not used for final Ceph-vs-MinIO performance claims.
+
+## Monitoring
+
+The local Docker Compose stack includes Prometheus and Grafana for Phase 6.
+Prometheus scrapes MinIO, Spark master/worker, Airflow metrics through
+statsd-exporter, and Prometheus itself. Grafana provisions the Prometheus
+datasource and a `Data Lake Local Overview` dashboard from files in git.
+
+Trino benchmark results are recorded by the query benchmark runner. Direct Trino
+JMX metrics are left for a later extension because the local Trino service does
+not expose Prometheus-format metrics by default.
 
 ## Phase 1 Local Storage
 

@@ -8,6 +8,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin123}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
     ports:
       - "19000:9000"
       - "19001:9001"
@@ -53,6 +54,10 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-airflow}:${AIRFLOW_DB_PASSWORD:-airflow}@postgres:5432/${AIRFLOW_DB_NAME:-airflow}
+      AIRFLOW__METRICS__STATSD_ON: "true"
+      AIRFLOW__METRICS__STATSD_HOST: statsd-exporter
+      AIRFLOW__METRICS__STATSD_PORT: 9125
+      AIRFLOW__METRICS__STATSD_PREFIX: airflow
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY:-local-dev-secret-key}
       DATA_LAKE_PROJECT_ROOT: /opt/airflow/project
       DATA_LAKE_PYTHON_BIN: python
@@ -97,6 +102,8 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+      statsd-exporter:
+        condition: service_started
     user: "${AIRFLOW_UID:-50000}:0"
     environment:
       <<: *airflow-common-env
@@ -119,6 +126,8 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+      statsd-exporter:
+        condition: service_started
     user: "${AIRFLOW_UID:-50000}:0"
     environment:
       <<: *airflow-common-env
@@ -165,6 +174,7 @@ services:
       - "8081:8080"
     volumes: &spark-common-volumes
       - ..:/opt/spark/project
+      - ./spark/metrics.properties:/opt/spark/conf/metrics.properties:ro
       - spark-ivy:/tmp/spark-ivy
       - spark-local:/tmp/spark-local
     command: >
@@ -252,9 +262,61 @@ services:
       timeout: 10s
       retries: 10
 
+  statsd-exporter:
+    image: ${STATSD_EXPORTER_IMAGE:-prom/statsd-exporter:v0.26.1}
+    container_name: ceph-data-lake-statsd-exporter
+    command:
+      - --statsd.mapping-config=/etc/statsd-exporter/mapping.yml
+    ports:
+      - "9102:9102"
+      - "9125:9125/udp"
+    volumes:
+      - ./prometheus/statsd-mapping.yml:/etc/statsd-exporter/mapping.yml:ro
+
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v2.53.1}
+    container_name: ceph-data-lake-prometheus
+    depends_on:
+      minio:
+        condition: service_started
+      statsd-exporter:
+        condition: service_started
+      spark-master:
+        condition: service_started
+      spark-worker:
+        condition: service_started
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:11.1.0}
+    container_name: ceph-data-lake-grafana
+    depends_on:
+      prometheus:
+        condition: service_started
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+
 volumes:
   minio-data:
   postgres-data:
   spark-ivy:
   spark-local:
   trino-metastore:
+  prometheus-data:
+  grafana-data:

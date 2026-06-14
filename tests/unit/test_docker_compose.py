@@ -44,7 +44,27 @@ class DockerComposeSourceTests(unittest.TestCase):
         self.assertIn("SPARK_MASTER_URL: spark://spark-master:7077", source)
         self.assertIn("S3_ENDPOINT: http://minio:9000", source)
         self.assertIn("- ..:/opt/spark/project", source)
+        self.assertIn("- ./spark/metrics.properties:/opt/spark/conf/metrics.properties:ro", source)
         self.assertIn("dockerfile: docker/spark/Dockerfile", source)
+
+    def test_monitoring_services_are_configured(self):
+        source = COMPOSE_PATH.read_text(encoding="utf-8")
+
+        for service in [
+            "statsd-exporter:",
+            "prometheus:",
+            "grafana:",
+        ]:
+            self.assertIn(service, source)
+
+        for fragment in [
+            "MINIO_PROMETHEUS_AUTH_TYPE: public",
+            "AIRFLOW__METRICS__STATSD_ON: \"true\"",
+            "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro",
+            "./grafana/provisioning:/etc/grafana/provisioning:ro",
+            "./grafana/dashboards:/var/lib/grafana/dashboards:ro",
+        ]:
+            self.assertIn(fragment, source)
 
 
 if __name__ == "__main__":

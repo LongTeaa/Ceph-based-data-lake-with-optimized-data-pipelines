@@ -1,4 +1,4 @@
-.PHONY: help config-check env-check lint test dag-check health up down airflow-up airflow-down airflow-logs airflow-dag-list spark-up spark-down spark-logs spark-submit-silver spark-submit-gold trino-up trino-down trino-logs trino-setup trino-smoke trino-cli init-buckets storage-smoke generate-test-data prepare-nyc-taxi ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query benchmark-trino e2e-smoke
+.PHONY: help config-check env-check lint test dag-check health up down airflow-up airflow-down airflow-logs airflow-dag-list spark-up spark-down spark-logs spark-submit-silver spark-submit-gold trino-up trino-down trino-logs trino-setup trino-smoke trino-cli monitoring-up monitoring-down monitoring-logs init-buckets storage-smoke generate-test-data prepare-nyc-taxi ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query benchmark-trino e2e-smoke
 
 REQUIRED_ENV := S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY S3_REGION BRONZE_BUCKET SILVER_BUCKET GOLD_BUCKET SYSTEM_BUCKET
 SOURCE ?= data/source/nyc-taxi
@@ -27,6 +27,8 @@ help:
 	@echo "  make trino-up           Start local Trino query service"
 	@echo "  make trino-smoke        Register and query NYC Taxi gold tables with Trino"
 	@echo "  make trino-cli          Open an interactive Trino SQL CLI"
+	@echo "  make monitoring-up      Start Prometheus, Grafana, and local metric targets"
+	@echo "  make monitoring-down    Stop Prometheus, Grafana, and statsd exporter"
 	@echo "  make init-buckets       Create Data Lake buckets"
 	@echo "  make storage-smoke      Upload/download/checksum smoke test"
 	@echo "  make health             Check S3 endpoint reachability"
@@ -110,6 +112,15 @@ trino-smoke: trino-setup
 
 trino-cli:
 	@docker compose -f docker/compose.yml exec trino trino --server localhost:8080 --catalog lake --schema nyc_taxi
+
+monitoring-up:
+	@docker compose -f docker/compose.yml up -d minio statsd-exporter spark-master spark-worker prometheus grafana
+
+monitoring-down:
+	@docker compose -f docker/compose.yml stop grafana prometheus statsd-exporter
+
+monitoring-logs:
+	@docker compose -f docker/compose.yml logs -f prometheus grafana statsd-exporter
 
 init-buckets: config-check
 	@python infrastructure/buckets/init_buckets.py
