@@ -1,7 +1,7 @@
 from decimal import Decimal
 import unittest
 
-from benchmark.query.spark_layout_benchmark import normalize_row, parse_sql_files, summarize_results
+from benchmark.query.spark_layout_benchmark import benchmark_layouts, normalize_row, parse_sql_files, summarize_results
 
 
 class SparkLayoutBenchmarkTests(unittest.TestCase):
@@ -76,6 +76,20 @@ class SparkLayoutBenchmarkTests(unittest.TestCase):
         summary = summarize_results(records)
 
         self.assertFalse(any(row["result_consistent"] for row in summary))
+
+    def test_compaction_requires_positive_coalesce_before_loading_settings(self):
+        with self.assertRaises(ValueError):
+            benchmark_layouts(
+                manifest_path="unused",
+                sql_files=[],
+                output_dir="unused",
+                run_id="unused",
+                iterations=1,
+                warmup=0,
+                comparison="compaction",
+                coalesce=0,
+                keep_layout=False,
+            )
 
 
 if __name__ == "__main__":

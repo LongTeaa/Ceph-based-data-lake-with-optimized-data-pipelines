@@ -1,4 +1,4 @@
-.PHONY: help config-check env-check lint test dag-check health up down airflow-up airflow-down airflow-logs airflow-dag-list spark-up spark-down spark-logs spark-submit-silver spark-submit-gold trino-up trino-down trino-logs trino-setup trino-smoke trino-cli monitoring-up monitoring-down monitoring-logs init-buckets storage-smoke generate-test-data prepare-nyc-taxi ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query benchmark-query-layout benchmark-trino e2e-smoke
+.PHONY: help config-check env-check lint test dag-check health up down airflow-up airflow-down airflow-logs airflow-dag-list spark-up spark-down spark-logs spark-submit-silver spark-submit-gold trino-up trino-down trino-logs trino-setup trino-smoke trino-cli monitoring-up monitoring-down monitoring-logs init-buckets storage-smoke generate-test-data prepare-nyc-taxi ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query benchmark-query-layout benchmark-query-compaction benchmark-trino e2e-smoke
 
 REQUIRED_ENV := S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY S3_REGION BRONZE_BUCKET SILVER_BUCKET GOLD_BUCKET SYSTEM_BUCKET
 SOURCE ?= data/source/nyc-taxi
@@ -14,6 +14,7 @@ QUERY_LAYOUT_BENCHMARK_ITERATIONS ?= 3
 QUERY_LAYOUT_BENCHMARK_WARMUP ?= 1
 QUERY_LAYOUT_BENCHMARK_OUTPUT_DIR ?= benchmark/results
 QUERY_LAYOUT_BENCHMARK_COALESCE ?= 0
+QUERY_COMPACTION_BENCHMARK_COALESCE ?= 1
 TRINO_BENCHMARK_ITERATIONS ?= 3
 TRINO_BENCHMARK_WARMUP ?= 1
 TRINO_BENCHMARK_OUTPUT_DIR ?= benchmark/results
@@ -52,6 +53,7 @@ help:
 	@echo "  make query-smoke        Run Spark SQL smoke queries on NYC Taxi silver/gold"
 	@echo "  make benchmark-query    Benchmark Spark SQL queries on NYC Taxi silver/gold"
 	@echo "  make benchmark-query-layout Compare partitioned and non-partitioned silver layouts"
+	@echo "  make benchmark-query-compaction Compare small-file and compacted silver layouts"
 	@echo "  make benchmark-trino    Benchmark Trino queries on NYC Taxi gold"
 	@echo "  make benchmark-storage  Benchmark S3-compatible PUT/GET/mixed workloads"
 	@echo "  make dag-check          Validate Airflow DAG source files"
@@ -171,7 +173,10 @@ benchmark-query:
 	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_sql_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_BENCHMARK_WARMUP)'"
 
 benchmark-query-layout:
-	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_layout_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_LAYOUT_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_LAYOUT_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_LAYOUT_BENCHMARK_WARMUP)' --coalesce '$(QUERY_LAYOUT_BENCHMARK_COALESCE)'"
+	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_layout_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_LAYOUT_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_LAYOUT_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_LAYOUT_BENCHMARK_WARMUP)' --comparison partition --coalesce '$(QUERY_LAYOUT_BENCHMARK_COALESCE)'"
+
+benchmark-query-compaction:
+	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_layout_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_LAYOUT_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_LAYOUT_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_LAYOUT_BENCHMARK_WARMUP)' --comparison compaction --coalesce '$(QUERY_COMPACTION_BENCHMARK_COALESCE)'"
 
 benchmark-trino:
 	@python benchmark/query/trino_benchmark.py --output-dir "$(TRINO_BENCHMARK_OUTPUT_DIR)" --run-id "$(BENCHMARK_RUN_ID)" --iterations "$(TRINO_BENCHMARK_ITERATIONS)" --warmup "$(TRINO_BENCHMARK_WARMUP)"

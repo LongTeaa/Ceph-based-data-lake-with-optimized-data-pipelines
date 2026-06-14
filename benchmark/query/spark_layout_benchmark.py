@@ -43,7 +43,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-id", default=os.getenv("BENCHMARK_RUN_ID", "local-baseline"))
     parser.add_argument("--iterations", type=int, default=3)
     parser.add_argument("--warmup", type=int, default=1)
-    parser.add_argument("--coalesce", type=int, default=0, help="Coalesce non-partitioned layout before write when > 0.")
+    parser.add_argument(
+        "--comparison",
+        choices=("partition", "compaction"),
+        default="partition",
+        help="Comparison to run: partitioned vs non-partitioned, or small-files vs compacted.",
+    )
+    parser.add_argument(
+        "--coalesce",
+        type=int,
+        default=0,
+        help="Coalesce generated layout before write. For compaction, values > 0 define compacted file count.",
+    )
     parser.add_argument(
         "--sql-files",
         default=",".join(str(path) for path in DEFAULT_SQL_FILES),
@@ -172,6 +183,61 @@ def cleanup_s3_prefix(spark, uri: str) -> None:
         filesystem.delete(path, True)
 
 
+def build_layout_specs(
+    spark,
+    source_df,
+    system_bucket: str,
+    run_id: str,
+    run_started_at: str,
+    year: str,
+    month: str,
+    partitioned_uri: str,
+    comparison: str,
+    coalesce: int,
+) -> tuple[list[tuple[str, str]], list[str], dict[str, str]]:
+    base_prefix = f"benchmark-layouts/{run_id}/{run_started_at}"
+    if comparison == "partition":
+        non_partitioned_uri = s3_uri(
+            system_bucket,
+            f"{base_prefix}/silver_non_partitioned/year={year}/month={month}",
+        )
+        cleanup_s3_prefix(spark, non_partitioned_uri)
+        output_df = source_df if coalesce == 0 else source_df.coalesce(coalesce)
+        output_df.write.mode("overwrite").parquet(non_partitioned_uri)
+        return (
+            [
+                ("partitioned", partitioned_uri),
+                ("non_partitioned", non_partitioned_uri),
+            ],
+            [non_partitioned_uri],
+            {"partitioned_uri": partitioned_uri, "non_partitioned_uri": non_partitioned_uri},
+        )
+
+    if coalesce <= 0:
+        raise ValueError("coalesce must be > 0 for compaction comparison")
+
+    small_files_uri = s3_uri(
+        system_bucket,
+        f"{base_prefix}/silver_small_files/year={year}/month={month}",
+    )
+    compacted_uri = s3_uri(
+        system_bucket,
+        f"{base_prefix}/silver_compacted/year={year}/month={month}",
+    )
+    cleanup_s3_prefix(spark, small_files_uri)
+    cleanup_s3_prefix(spark, compacted_uri)
+    source_df.repartition("pickup_date").write.mode("overwrite").parquet(small_files_uri)
+    source_df.coalesce(coalesce).write.mode("overwrite").parquet(compacted_uri)
+    return (
+        [
+            ("small_files", small_files_uri),
+            ("compacted", compacted_uri),
+        ],
+        [small_files_uri, compacted_uri],
+        {"small_files_uri": small_files_uri, "compacted_uri": compacted_uri},
+    )
+
+
 def benchmark_layouts(
     manifest_path: Path,
     sql_files: list[Path],
@@ -179,6 +245,7 @@ def benchmark_layouts(
     run_id: str,
     iterations: int,
     warmup: int,
+    comparison: str,
     coalesce: int,
     keep_layout: bool,
 ) -> dict[str, Any]:
@@ -188,25 +255,33 @@ def benchmark_layouts(
         raise ValueError("warmup must be >= 0")
     if coalesce < 0:
         raise ValueError("coalesce must be >= 0")
+    if comparison == "compaction" and coalesce <= 0:
+        raise ValueError("coalesce must be > 0 for compaction comparison")
 
     settings = load_settings()
     manifest = load_manifest(manifest_path)
     batch = batch_from_manifest(manifest, settings.silver_bucket)
     run_started_at = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_dir = output_dir / run_id / "query" / "spark_layout" / run_started_at
-    non_partitioned_uri = s3_uri(
-        settings.system_bucket,
-        f"benchmark-layouts/{run_id}/{run_started_at}/silver_non_partitioned/year={batch.year}/month={batch.month}",
-    )
 
     spark = create_spark_session(JOB_NAME)
     records: list[dict[str, Any]] = []
+    generated_uris: list[str] = []
     try:
         configure_s3a(spark, settings)
         partitioned_df = spark.read.parquet(batch.silver_uri)
-        non_partitioned_df = partitioned_df if coalesce == 0 else partitioned_df.coalesce(coalesce)
-        cleanup_s3_prefix(spark, non_partitioned_uri)
-        non_partitioned_df.write.mode("overwrite").parquet(non_partitioned_uri)
+        layouts, generated_uris, generated_uri_doc = build_layout_specs(
+            spark=spark,
+            source_df=partitioned_df,
+            system_bucket=settings.system_bucket,
+            run_id=run_id,
+            run_started_at=run_started_at,
+            year=batch.year,
+            month=batch.month,
+            partitioned_uri=batch.silver_uri,
+            comparison=comparison,
+            coalesce=coalesce,
+        )
 
         values_row = partitioned_df.selectExpr(
             "CAST(MIN(pickup_date) AS STRING) AS start_date",
@@ -219,15 +294,11 @@ def benchmark_layouts(
             "end_date": values_row["end_date"],
             "pickup_date": values_row["start_date"],
         }
-        layouts = [
-            ("partitioned", batch.silver_uri),
-            ("non_partitioned", non_partitioned_uri),
-        ]
         scenario = {
             "run_id": run_id,
             "engine": "spark_sql",
             "job_name": JOB_NAME,
-            "comparison": "parquet_partitioned_vs_non_partitioned",
+            "comparison": comparison,
             "dataset": batch.dataset,
             "taxi_type": batch.taxi_type,
             "year": batch.year,
@@ -236,10 +307,9 @@ def benchmark_layouts(
             "warmup": warmup,
             "coalesce": coalesce,
             "queries": [str(path.relative_to(PROJECT_ROOT)) for path in sql_files],
-            "partitioned_uri": batch.silver_uri,
-            "non_partitioned_uri": non_partitioned_uri,
             "keep_layout": keep_layout,
         }
+        scenario.update(generated_uri_doc)
         environment = {
             "python": sys.version,
             "platform": platform.platform(),
@@ -295,11 +365,18 @@ def benchmark_layouts(
         write_jsonl(run_dir / "raw-results.jsonl", records)
         write_summary_csv(run_dir / "summary.csv", summary)
         write_json(run_dir / "summary.json", {"summary": summary})
-        write_json(run_dir / "notes.json", {"cleanup_non_partitioned_layout": not keep_layout})
+        write_json(
+            run_dir / "notes.json",
+            {
+                "cleanup_generated_layouts": not keep_layout,
+                "generated_layout_count": len(generated_uris),
+            },
+        )
         return {"run_dir": str(run_dir), "summary": summary}
     finally:
         if not keep_layout:
-            cleanup_s3_prefix(spark, non_partitioned_uri)
+            for uri in generated_uris:
+                cleanup_s3_prefix(spark, uri)
         spark.stop()
 
 
@@ -313,6 +390,7 @@ def main() -> int:
             run_id=args.run_id,
             iterations=args.iterations,
             warmup=args.warmup,
+            comparison=args.comparison,
             coalesce=args.coalesce,
             keep_layout=args.keep_layout,
         )

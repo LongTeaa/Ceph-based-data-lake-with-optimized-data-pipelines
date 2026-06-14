@@ -144,6 +144,32 @@ notes.json
 show that the partitioned and non-partitioned layouts returned equivalent
 answers before comparing timings.
 
+The same runner also supports a small-file compaction comparison:
+
+```bash
+make benchmark-query-compaction QUERY_LAYOUT_BENCHMARK_WARMUP=0 QUERY_LAYOUT_BENCHMARK_ITERATIONS=1
+```
+
+This mode creates two temporary silver copies under the system bucket:
+
+```text
+small_files
+compacted
+```
+
+The `small_files` layout is written after repartitioning by `pickup_date`, which
+keeps the benchmark sensitive to file-open and object-listing overhead. The
+`compacted` layout is written with `coalesce`, defaulting to one output file in
+the local target:
+
+```bash
+make benchmark-query-compaction QUERY_COMPACTION_BENCHMARK_COALESCE=1
+```
+
+The query set and output schema are the same as the partition layout benchmark.
+Use this comparison to explain the trade-off between many small Parquet files
+and fewer compacted files on S3-compatible object storage.
+
 ## Runtime Notes
 
 `make query-smoke` runs through the Docker Compose `spark-submit` service and
