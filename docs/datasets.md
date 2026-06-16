@@ -71,6 +71,48 @@ exists with different content, the script fails unless you intentionally pass
 Row count and schema inspection are deferred to the Spark phase. Phase 2 only
 locks down file provenance, checksum, and bronze object layout.
 
+## Synthetic Tabular Data
+
+Synthetic tabular data is for unit tests, integration tests, and scale checks.
+It is not a replacement for the NYC Taxi analytics dataset.
+
+Generate deterministic CSV and JSON Lines records:
+
+```bash
+make generate-tabular-data ROWS=10000 DAYS=7 SEED=42
+```
+
+This writes a batch under:
+
+```text
+data/source/synthetic/tabular/<batch-id>/
+```
+
+The records include valid rows plus intentional quality cases such as negative
+amounts, invalid timestamps, null passenger counts, and duplicate candidates.
+Running the command twice with the same `ROWS`, `DAYS`, and `SEED` produces the
+same record files and checksums.
+
+## Synthetic Binary Data
+
+Synthetic binary data is for S3 PUT/GET benchmark payloads where object size
+must be controlled exactly.
+
+Generate deterministic binary objects:
+
+```bash
+make generate-binary-data BINARY_OBJECT_SIZES=4KiB,1MiB BINARY_OBJECT_COUNT=2 SEED=42
+```
+
+This writes a batch under:
+
+```text
+data/source/synthetic/binary/<batch-id>/
+```
+
+The batch manifest records object size, local path, seed, byte size, and SHA-256
+checksum for each file.
+
 ## Silver NYC Taxi
 
 Transform the manifest-described bronze file into cleaned silver Parquet and

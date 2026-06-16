@@ -1,4 +1,4 @@
-.PHONY: help config-check env-check lint test dag-check health up down airflow-up airflow-down airflow-logs airflow-dag-list spark-up spark-down spark-logs spark-submit-silver spark-submit-gold trino-up trino-down trino-logs trino-setup trino-smoke trino-cli monitoring-up monitoring-down monitoring-logs init-buckets storage-smoke generate-test-data prepare-nyc-taxi ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query benchmark-query-layout benchmark-query-compaction benchmark-query-format benchmark-trino e2e-smoke
+.PHONY: help config-check env-check lint test dag-check health up down airflow-up airflow-down airflow-logs airflow-dag-list spark-up spark-down spark-logs spark-submit-silver spark-submit-gold trino-up trino-down trino-logs trino-setup trino-smoke trino-cli monitoring-up monitoring-down monitoring-logs init-buckets storage-smoke generate-test-data generate-tabular-data generate-binary-data prepare-nyc-taxi ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query benchmark-query-layout benchmark-query-compaction benchmark-query-format benchmark-trino e2e-smoke
 
 REQUIRED_ENV := S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY S3_REGION BRONZE_BUCKET SILVER_BUCKET GOLD_BUCKET SYSTEM_BUCKET
 SOURCE ?= data/source/nyc-taxi
@@ -25,6 +25,13 @@ STORAGE_BENCHMARK_CONCURRENCY ?= 1,4
 STORAGE_BENCHMARK_OPERATIONS ?= put,get,mixed
 STORAGE_BENCHMARK_ITERATIONS ?= 10
 STORAGE_BENCHMARK_WARMUP ?= 2
+ROWS ?= 10000
+DAYS ?= 7
+SEED ?= 42
+SYNTHETIC_OUTPUT_DIR ?= data/source/synthetic
+SYNTHETIC_BATCH_ID ?=
+BINARY_OBJECT_SIZES ?= 4KiB,1MiB
+BINARY_OBJECT_COUNT ?= 2
 
 help:
 	@echo "Ceph-based Data Lake commands"
@@ -45,6 +52,7 @@ help:
 	@echo "  make storage-smoke      Upload/download/checksum smoke test"
 	@echo "  make health             Check S3 endpoint reachability"
 	@echo "  make test               Run available tests"
+	@echo "  make generate-test-data Generate deterministic synthetic tabular and binary data"
 	@echo "  make prepare-nyc-taxi   Create NYC Taxi source manifest"
 	@echo "  make ingest             Upload manifest-described files to bronze"
 	@echo "  make transform          Transform NYC Taxi bronze to silver and gold"
@@ -65,10 +73,10 @@ config-check:
 env-check: config-check
 
 lint:
-	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','benchmark/query/spark_layout_benchmark.py','benchmark/query/trino_benchmark.py','benchmark/storage/s3_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
+	@python -c "from pathlib import Path; files=['generator/generate_test_records.py','generator/generate_binary_objects.py','ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','benchmark/query/spark_layout_benchmark.py','benchmark/query/trino_benchmark.py','benchmark/storage/s3_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
 
 test:
-	@python -c "from pathlib import Path; files=['ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','benchmark/query/spark_layout_benchmark.py','benchmark/query/trino_benchmark.py','benchmark/storage/s3_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
+	@python -c "from pathlib import Path; files=['generator/generate_test_records.py','generator/generate_binary_objects.py','ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','benchmark/query/spark_layout_benchmark.py','benchmark/query/trino_benchmark.py','benchmark/storage/s3_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
 	@python -m unittest discover -s tests/unit
 	@echo "Available syntax and unit checks passed."
 
@@ -144,8 +152,13 @@ init-buckets: config-check
 storage-smoke: config-check
 	@python infrastructure/buckets/storage_smoke.py
 
-generate-test-data:
-	@echo "Not implemented in Phase 0. Planned for Phase 2."
+generate-test-data: generate-tabular-data generate-binary-data
+
+generate-tabular-data:
+	@python generator/generate_test_records.py --rows "$(ROWS)" --days "$(DAYS)" --seed "$(SEED)" --output-dir "$(SYNTHETIC_OUTPUT_DIR)/tabular" $(if $(SYNTHETIC_BATCH_ID),--batch-id "$(SYNTHETIC_BATCH_ID)")
+
+generate-binary-data:
+	@python generator/generate_binary_objects.py --object-sizes "$(BINARY_OBJECT_SIZES)" --count "$(BINARY_OBJECT_COUNT)" --seed "$(SEED)" --output-dir "$(SYNTHETIC_OUTPUT_DIR)/binary" $(if $(SYNTHETIC_BATCH_ID),--batch-id "$(SYNTHETIC_BATCH_ID)")
 
 prepare-nyc-taxi:
 	@python ingestion/nyc_taxi_manifest.py --source-dir "$(SOURCE)" --file-name "$(FILE)" --manifest-path "$(MANIFEST)"
@@ -185,5 +198,5 @@ benchmark-query-format:
 benchmark-trino:
 	@python benchmark/query/trino_benchmark.py --output-dir "$(TRINO_BENCHMARK_OUTPUT_DIR)" --run-id "$(BENCHMARK_RUN_ID)" --iterations "$(TRINO_BENCHMARK_ITERATIONS)" --warmup "$(TRINO_BENCHMARK_WARMUP)"
 
-e2e-smoke:
-	@echo "Not implemented in Phase 0. Planned after storage and Spark are available."
+e2e-smoke: config-check init-buckets storage-smoke prepare-nyc-taxi ingest transform query-smoke
+	@echo "e2e-smoke ok"

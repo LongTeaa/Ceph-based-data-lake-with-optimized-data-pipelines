@@ -9,18 +9,21 @@ monitoring. The implementation roadmap is kept locally in `workflow.md`.
 
 ## Current Status
 
-Phase 1 is complete, Phase 2 bronze ingestion is available, Phase 3 Spark ETL
-is available for NYC Taxi bronze, silver, and gold datasets, Phase 4 has a
-manual Airflow DAG that submits transform jobs to local Spark standalone, and
-Phase 5 has a query layer with Spark SQL smoke/benchmark queries and an
-optional Trino service for SQL analytics over gold Parquet, and Phase 6 has
-local Prometheus/Grafana monitoring for MinIO, Spark, and Airflow metrics:
+Phase 1 is complete for local S3-compatible storage, Phase 2 bronze ingestion
+and synthetic data generation are available, Phase 3 Spark ETL is available for
+NYC Taxi bronze, silver, and gold datasets, Phase 4 has a manual Airflow DAG
+that submits transform jobs to local Spark standalone, Phase 5 has a query
+layer with Spark SQL smoke/benchmark queries and an optional Trino service for
+SQL analytics over gold Parquet, Phase 6 has local Prometheus/Grafana
+monitoring for MinIO, Spark, and Airflow metrics, and Phase 7 has a lightweight
+S3 storage benchmark runner:
 
 - Repository skeleton exists.
 - Runtime configuration template exists in `.env.example`.
 - Local S3-compatible storage can be started with Docker Compose.
 - Bucket initialization and upload/download/checksum smoke tests are available.
 - NYC Taxi source manifest generation is available.
+- Deterministic synthetic tabular and binary data generators are available.
 - Idempotent bronze upload for manifest-described files is available.
 - NYC Taxi bronze-to-silver Spark transform is available.
 - NYC Taxi silver-to-gold Spark aggregations are available.
@@ -32,8 +35,8 @@ local Prometheus/Grafana monitoring for MinIO, Spark, and Airflow metrics:
 - Trino can register and query NYC Taxi gold Parquet tables from MinIO.
 - Prometheus and Grafana can be started locally with provisioned scrape config,
   datasource, and dashboard files.
+- A boto3-based S3 storage benchmark runner is available.
 - Dataset documentation is available in `docs/datasets.md`.
-- Storage benchmark runner is not implemented yet.
 
 ## Prerequisites
 
@@ -83,6 +86,12 @@ Run local checks:
 ```bash
 make test
 make dag-check
+```
+
+Generate deterministic synthetic tabular and binary data:
+
+```bash
+make generate-test-data ROWS=10000 DAYS=7 SEED=42
 ```
 
 Start local S3-compatible storage, create buckets, and run a smoke test:
@@ -173,6 +182,12 @@ Run a lightweight S3-compatible storage benchmark:
 make benchmark-storage
 ```
 
+Run a local end-to-end smoke workflow after storage and Spark are available:
+
+```bash
+make e2e-smoke
+```
+
 Use a one-operation smoke benchmark on small machines:
 
 ```bash
@@ -222,6 +237,12 @@ Expected local paths:
 - Optional Wikimedia image dataset: `data/source/images/`
 - Pipeline outputs: `data/bronze/`, `data/silver/`, `data/gold/`
 - Benchmark output: `results/`
+
+Generate test/benchmark source data:
+
+```bash
+make generate-test-data ROWS=10000 DAYS=7 SEED=42
+```
 
 The main analytics dataset is NYC Yellow Taxi. Synthetic data is only for tests,
 scale experiments, and object-storage benchmark payloads.
