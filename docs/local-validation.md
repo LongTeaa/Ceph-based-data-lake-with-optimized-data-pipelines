@@ -238,6 +238,75 @@ The local validation does not prove:
 - production-scale throughput or latency;
 - fault tolerance under OSD/RGW/node failure.
 
+## Local Storage Benchmark
+
+Run directory:
+
+```text
+benchmark/results/local-baseline/storage/s3/20260616T084308Z/
+```
+
+Command:
+
+```bash
+make benchmark-storage STORAGE_BENCHMARK_OBJECT_SIZES=4KiB,1MiB STORAGE_BENCHMARK_CONCURRENCY=1,4 STORAGE_BENCHMARK_OPERATIONS=put,get,mixed STORAGE_BENCHMARK_WARMUP=1 STORAGE_BENCHMARK_ITERATIONS=3
+```
+
+Scenario:
+
+```text
+backend: local-s3
+engine: boto3
+bucket: datalake-system
+endpoint: http://localhost:19000
+object sizes: 4 KiB, 1 MiB
+concurrency: 1, 4
+operations: put, get, mixed
+warmup: 1
+measured iterations: 3
+errors: 0 in all scenarios
+cleanup_objects: true
+```
+
+Summary:
+
+| Operation | Object size | Concurrency | Throughput MiB/s | Ops/s | p50 ms | p95 ms | Errors |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| GET | 4 KiB | 1 | 1.049 | 268.601 | 3.625 | 4.440 | 0 |
+| GET | 4 KiB | 4 | 1.312 | 335.909 | 6.893 | 7.869 | 0 |
+| GET | 1 MiB | 1 | 73.817 | 73.817 | 13.164 | 13.942 | 0 |
+| GET | 1 MiB | 4 | 135.459 | 135.459 | 19.831 | 19.915 | 0 |
+| PUT | 4 KiB | 1 | 0.342 | 87.624 | 11.642 | 12.222 | 0 |
+| PUT | 4 KiB | 4 | 0.573 | 146.620 | 9.495 | 16.217 | 0 |
+| PUT | 1 MiB | 1 | 20.719 | 20.719 | 35.949 | 76.160 | 0 |
+| PUT | 1 MiB | 4 | 35.872 | 35.872 | 71.152 | 82.092 | 0 |
+| mixed | 4 KiB | 1 | 0.896 | 229.428 | 3.363 | 6.055 | 0 |
+| mixed | 4 KiB | 4 | 0.709 | 181.609 | 13.561 | 14.498 | 0 |
+| mixed | 1 MiB | 1 | 25.001 | 25.001 | 27.805 | 64.776 | 0 |
+| mixed | 1 MiB | 4 | 62.633 | 62.633 | 44.062 | 46.454 | 0 |
+
+Interpretation:
+
+- The benchmark method is working: every PUT/GET/mixed scenario completed with
+  zero errors and checksum validation enabled.
+- GET throughput was higher than PUT throughput for 1 MiB objects in this local
+  MinIO run. The best measured GET scenario reached `135.459 MiB/s` at
+  concurrency `4`, while the best measured PUT scenario reached `35.872 MiB/s`.
+- Increasing concurrency from `1` to `4` improved 1 MiB throughput for GET, PUT,
+  and mixed workloads.
+- Small 4 KiB objects are dominated by per-request overhead, so MiB/s is low
+  even when operations per second is relatively high.
+- The mixed workload is not directly comparable with pure GET or pure PUT
+  because it uses a `0.3` read ratio and includes both operation types.
+
+Limitations:
+
+- This is a local MinIO baseline on one machine, not a Ceph RGW result.
+- The run used only `3` measured iterations per scenario, so the numbers are
+  smoke-level evidence rather than stable performance statistics.
+- Larger object sizes, higher concurrency, repeated measured runs, and host
+  metrics are still needed before drawing stronger performance conclusions.
+
 ## Next Steps
 
 Recommended next steps:
