@@ -317,7 +317,13 @@ concurrency, checksum validation, raw JSONL output, and CSV/JSON summaries. See
 [docs/storage-benchmark.md](docs/storage-benchmark.md) for run commands,
 scenario parameters, and output format.
 
+## Local Validation
+
+Current local validation results, including `make test`, `make e2e-smoke`,
+Airflow DAG success, and Phase 8 query benchmark baselines, are summarized in
+[docs/local-validation.md](docs/local-validation.md).
+
 ## Next Phase
 
-Continue Phase 8 by running the layout, compaction, and format benchmarks with
-more iterations or against a larger NYC Taxi dataset.
+Continue by running storage benchmarks against local MinIO and then a real Ceph
+RGW endpoint with the same benchmark matrix.
