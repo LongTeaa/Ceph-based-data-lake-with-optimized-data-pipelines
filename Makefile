@@ -198,5 +198,5 @@ benchmark-query-format:
 benchmark-trino:
 	@python benchmark/query/trino_benchmark.py --output-dir "$(TRINO_BENCHMARK_OUTPUT_DIR)" --run-id "$(BENCHMARK_RUN_ID)" --iterations "$(TRINO_BENCHMARK_ITERATIONS)" --warmup "$(TRINO_BENCHMARK_WARMUP)"
 
-e2e-smoke: config-check init-buckets storage-smoke prepare-nyc-taxi ingest transform query-smoke
+e2e-smoke: config-check init-buckets storage-smoke prepare-nyc-taxi ingest spark-submit-silver spark-submit-gold query-smoke
 	@echo "e2e-smoke ok"
