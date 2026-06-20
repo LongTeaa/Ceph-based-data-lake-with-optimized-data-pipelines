@@ -175,16 +175,58 @@ Summary:
 | PUT | 4 KiB | 1 | 5 | 0 | 0.046 | 11.666 | 58.733 | 141.375 | 141.649 |
 | GET | 4 KiB | 1 | 5 | 0 | 0.251 | 64.276 | 9.790 | 33.070 | 37.530 |
 
+An expanded 1 MiB storage benchmark was also executed:
+
+```bash
+make benchmark-storage BENCHMARK_RUN_ID=ceph-3vm-baseline STORAGE_BENCHMARK_BACKEND=ceph-rgw STORAGE_BENCHMARK_OBJECT_SIZES=1MiB STORAGE_BENCHMARK_CONCURRENCY=1,4 STORAGE_BENCHMARK_OPERATIONS=put,get,mixed STORAGE_BENCHMARK_WARMUP=1 STORAGE_BENCHMARK_ITERATIONS=3
+```
+
+Result directory:
+
+```text
+benchmark/results/ceph-3vm-baseline/storage/s3/20260620T094044Z/
+```
+
+Scenario:
+
+```text
+backend: ceph-rgw
+engine: boto3
+bucket: datalake-system
+endpoint: http://192.168.56.101:7480
+object size: 1 MiB
+concurrency: 1, 4
+operations: PUT, GET, mixed
+warmup: 1
+measured iterations: 3
+errors: 0 in all scenarios
+```
+
+Summary:
+
+| Operation | Object size | Concurrency | Runs | Errors | Throughput MiB/s | Ops/s | p50 ms | p95 ms | p99 ms |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| GET | 1 MiB | 1 | 3 | 0 | 16.398 | 16.398 | 55.836 | 72.165 | 73.616 |
+| GET | 1 MiB | 4 | 3 | 0 | 13.922 | 13.922 | 196.241 | 210.195 | 211.436 |
+| mixed | 1 MiB | 1 | 3 | 0 | 8.403 | 8.403 | 116.116 | 128.502 | 129.603 |
+| mixed | 1 MiB | 4 | 3 | 0 | 10.433 | 10.433 | 271.014 | 285.377 | 286.654 |
+| PUT | 1 MiB | 1 | 3 | 0 | 6.221 | 6.221 | 128.413 | 219.659 | 227.769 |
+| PUT | 1 MiB | 4 | 3 | 0 | 7.585 | 7.585 | 360.249 | 390.216 | 392.880 |
+
 Interpretation:
 
 - Both Ceph RGW storage benchmark smoke runs completed with zero errors.
 - The benchmark runner can use the same S3 API path against Ceph that was used
   for the MinIO baseline.
+- The 1 MiB run also completed with zero errors across GET, PUT, and mixed
+  workloads at concurrency `1` and `4`.
+- In this small lab run, GET throughput was higher than PUT throughput for
+  1 MiB objects. Increasing concurrency from `1` to `4` improved PUT and mixed
+  throughput, but GET throughput decreased and latency increased.
 - The values are expected to be modest because the environment is a
-  resource-constrained VirtualBox lab and the benchmark used only 4 KiB objects
-  with five measured operations.
-- Larger object sizes, higher concurrency, repeated measured runs, and host
-  resource metrics are still required before comparing Ceph with MinIO.
+  resource-constrained VirtualBox lab.
+- Higher object sizes, repeated measured runs, and host resource metrics are
+  still required before drawing stronger Ceph-vs-MinIO conclusions.
 
 ## Interpretation
 
@@ -218,8 +260,6 @@ validation step.
 
 ## Next Steps
 
-1. Run a broader Ceph RGW storage benchmark with at least 1 MiB objects,
-   concurrency greater than 1, warm-up runs, and repeated measured runs.
-2. Compare the expanded Ceph benchmark with the existing MinIO local baseline.
-3. Validate Trino against the Ceph-backed gold tables.
-4. Run one controlled fault-tolerance scenario if host resources allow it.
+1. Compare the expanded Ceph benchmark with the existing MinIO local baseline.
+2. Validate Trino against the Ceph-backed gold tables.
+3. Run one controlled fault-tolerance scenario if host resources allow it.
