@@ -26,7 +26,7 @@ class DockerComposeSourceTests(unittest.TestCase):
         self.assertIn("- ..:/opt/airflow/project", source)
         self.assertIn("- ../airflow/dags:/opt/airflow/dags", source)
         self.assertIn("DATA_LAKE_PROJECT_ROOT: /opt/airflow/project", source)
-        self.assertIn("S3_ENDPOINT: http://minio:9000", source)
+        self.assertIn("S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}", source)
 
     def test_airflow_uses_project_image_with_spark_client(self):
         source = COMPOSE_PATH.read_text(encoding="utf-8")
@@ -36,16 +36,23 @@ class DockerComposeSourceTests(unittest.TestCase):
         self.assertIn("DATA_LAKE_SPARK_SUBMIT_BIN: spark-submit", source)
         self.assertIn("SPARK_IVY_DIR: /opt/airflow/project/.spark-ivy", source)
 
-    def test_spark_standalone_services_are_configured_for_minio(self):
+    def test_spark_standalone_services_use_configurable_s3_endpoint(self):
         source = COMPOSE_PATH.read_text(encoding="utf-8")
 
         self.assertIn("SPARK_MODE: master", source)
         self.assertIn("SPARK_MODE: worker", source)
         self.assertIn("SPARK_MASTER_URL: spark://spark-master:7077", source)
-        self.assertIn("S3_ENDPOINT: http://minio:9000", source)
+        self.assertIn("S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}", source)
         self.assertIn("- ..:/opt/spark/project", source)
         self.assertIn("- ./spark/metrics.properties:/opt/spark/conf/metrics.properties:ro", source)
         self.assertIn("dockerfile: docker/spark/Dockerfile", source)
+
+    def test_trino_uses_configurable_s3_endpoint(self):
+        source = COMPOSE_PATH.read_text(encoding="utf-8")
+        catalog = Path("docker/trino/catalog/lake.properties").read_text(encoding="utf-8")
+
+        self.assertIn("S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}", source)
+        self.assertIn("s3.endpoint=${ENV:S3_ENDPOINT}", catalog)
 
     def test_monitoring_services_are_configured(self):
         source = COMPOSE_PATH.read_text(encoding="utf-8")

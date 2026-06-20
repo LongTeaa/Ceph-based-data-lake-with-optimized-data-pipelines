@@ -1,6 +1,7 @@
 .PHONY: help config-check env-check lint test dag-check health up down airflow-up airflow-down airflow-logs airflow-dag-list spark-up spark-down spark-logs spark-submit-silver spark-submit-gold trino-up trino-down trino-logs trino-setup trino-smoke trino-cli monitoring-up monitoring-down monitoring-logs init-buckets storage-smoke generate-test-data generate-tabular-data generate-binary-data prepare-nyc-taxi ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query benchmark-query-layout benchmark-query-compaction benchmark-query-format benchmark-trino e2e-smoke
 
 REQUIRED_ENV := S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY S3_REGION BRONZE_BUCKET SILVER_BUCKET GOLD_BUCKET SYSTEM_BUCKET
+COMPOSE := docker compose --env-file .env -f docker/compose.yml
 SOURCE ?= data/source/nyc-taxi
 FILE ?= yellow_tripdata_2025-01.parquet
 MANIFEST ?= data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
@@ -87,64 +88,64 @@ health: config-check
 	@python infrastructure/buckets/storage_smoke.py --health-only
 
 up:
-	@docker compose -f docker/compose.yml up -d minio
+	@$(COMPOSE) up -d minio
 
 down:
-	@docker compose -f docker/compose.yml down
+	@$(COMPOSE) down
 
 airflow-up:
-	@docker compose -f docker/compose.yml up -d minio postgres spark-master spark-worker airflow-init airflow-webserver airflow-scheduler
+	@$(COMPOSE) up -d postgres spark-master spark-worker airflow-init airflow-webserver airflow-scheduler
 
 airflow-down:
-	@docker compose -f docker/compose.yml stop airflow-scheduler airflow-webserver postgres
+	@$(COMPOSE) stop airflow-scheduler airflow-webserver postgres
 
 airflow-logs:
-	@docker compose -f docker/compose.yml logs -f airflow-scheduler airflow-webserver
+	@$(COMPOSE) logs -f airflow-scheduler airflow-webserver
 
 airflow-dag-list:
-	@docker compose -f docker/compose.yml exec airflow-webserver airflow dags list
+	@$(COMPOSE) exec airflow-webserver airflow dags list
 
 spark-up:
-	@docker compose -f docker/compose.yml up -d minio spark-master spark-worker
+	@$(COMPOSE) up -d spark-master spark-worker
 
 spark-down:
-	@docker compose -f docker/compose.yml stop spark-worker spark-master
+	@$(COMPOSE) stop spark-worker spark-master
 
 spark-logs:
-	@docker compose -f docker/compose.yml logs -f spark-master spark-worker
+	@$(COMPOSE) logs -f spark-master spark-worker
 
 spark-submit-silver:
-	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 spark/jobs/nyc_taxi_bronze_to_silver.py --manifest-path '$(MANIFEST)' --output-dir '$(OUTPUT_DIR)' --mode '$(TRANSFORM_MODE)'"
+	@$(COMPOSE) run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 spark/jobs/nyc_taxi_bronze_to_silver.py --manifest-path '$(MANIFEST)' --output-dir '$(OUTPUT_DIR)' --mode '$(TRANSFORM_MODE)'"
 
 spark-submit-gold:
-	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 spark/jobs/nyc_taxi_silver_to_gold.py --manifest-path '$(MANIFEST)' --output-dir '$(OUTPUT_DIR)' --mode '$(TRANSFORM_MODE)'"
+	@$(COMPOSE) run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 spark/jobs/nyc_taxi_silver_to_gold.py --manifest-path '$(MANIFEST)' --output-dir '$(OUTPUT_DIR)' --mode '$(TRANSFORM_MODE)'"
 
 trino-up:
-	@docker compose -f docker/compose.yml up -d minio trino
+	@$(COMPOSE) up -d trino
 
 trino-down:
-	@docker compose -f docker/compose.yml stop trino
+	@$(COMPOSE) stop trino
 
 trino-logs:
-	@docker compose -f docker/compose.yml logs -f trino
+	@$(COMPOSE) logs -f trino
 
 trino-setup:
-	@docker compose -f docker/compose.yml exec -T trino trino --server localhost:8080 --file /etc/trino/sql/nyc_taxi_gold_setup.sql
+	@$(COMPOSE) exec -T trino trino --server localhost:8080 --file /etc/trino/sql/nyc_taxi_gold_setup.sql
 
 trino-smoke: trino-setup
-	@docker compose -f docker/compose.yml exec -T trino trino --server localhost:8080 --file /etc/trino/sql/nyc_taxi_gold_smoke.sql
+	@$(COMPOSE) exec -T trino trino --server localhost:8080 --file /etc/trino/sql/nyc_taxi_gold_smoke.sql
 
 trino-cli:
-	@docker compose -f docker/compose.yml exec trino trino --server localhost:8080 --catalog lake --schema nyc_taxi
+	@$(COMPOSE) exec trino trino --server localhost:8080 --catalog lake --schema nyc_taxi
 
 monitoring-up:
-	@docker compose -f docker/compose.yml up -d minio statsd-exporter spark-master spark-worker prometheus grafana
+	@$(COMPOSE) up -d statsd-exporter spark-master spark-worker prometheus grafana
 
 monitoring-down:
-	@docker compose -f docker/compose.yml stop grafana prometheus statsd-exporter
+	@$(COMPOSE) stop grafana prometheus statsd-exporter
 
 monitoring-logs:
-	@docker compose -f docker/compose.yml logs -f prometheus grafana statsd-exporter
+	@$(COMPOSE) logs -f prometheus grafana statsd-exporter
 
 init-buckets: config-check
 	@python infrastructure/buckets/init_buckets.py
@@ -178,22 +179,22 @@ publish:
 	@echo "Not implemented in Phase 0. Planned for Phase 3/4."
 
 query-smoke:
-	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 spark/jobs/nyc_taxi_query_smoke.py --manifest-path '$(MANIFEST)' --output-dir '$(OUTPUT_DIR)'"
+	@$(COMPOSE) run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 spark/jobs/nyc_taxi_query_smoke.py --manifest-path '$(MANIFEST)' --output-dir '$(OUTPUT_DIR)'"
 
 benchmark-storage:
 	@python benchmark/storage/s3_benchmark.py --output-dir "$(STORAGE_BENCHMARK_OUTPUT_DIR)" --run-id "$(BENCHMARK_RUN_ID)" --backend "$(STORAGE_BENCHMARK_BACKEND)" --object-sizes "$(STORAGE_BENCHMARK_OBJECT_SIZES)" --concurrency "$(STORAGE_BENCHMARK_CONCURRENCY)" --operations "$(STORAGE_BENCHMARK_OPERATIONS)" --iterations "$(STORAGE_BENCHMARK_ITERATIONS)" --warmup "$(STORAGE_BENCHMARK_WARMUP)"
 
 benchmark-query:
-	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_sql_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_BENCHMARK_WARMUP)'"
+	@$(COMPOSE) run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_sql_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_BENCHMARK_WARMUP)'"
 
 benchmark-query-layout:
-	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_layout_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_LAYOUT_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_LAYOUT_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_LAYOUT_BENCHMARK_WARMUP)' --comparison partition --coalesce '$(QUERY_LAYOUT_BENCHMARK_COALESCE)'"
+	@$(COMPOSE) run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_layout_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_LAYOUT_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_LAYOUT_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_LAYOUT_BENCHMARK_WARMUP)' --comparison partition --coalesce '$(QUERY_LAYOUT_BENCHMARK_COALESCE)'"
 
 benchmark-query-compaction:
-	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_layout_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_LAYOUT_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_LAYOUT_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_LAYOUT_BENCHMARK_WARMUP)' --comparison compaction --coalesce '$(QUERY_COMPACTION_BENCHMARK_COALESCE)'"
+	@$(COMPOSE) run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_layout_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_LAYOUT_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_LAYOUT_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_LAYOUT_BENCHMARK_WARMUP)' --comparison compaction --coalesce '$(QUERY_COMPACTION_BENCHMARK_COALESCE)'"
 
 benchmark-query-format:
-	@docker compose -f docker/compose.yml run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_layout_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_LAYOUT_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_LAYOUT_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_LAYOUT_BENCHMARK_WARMUP)' --comparison format --coalesce '$(QUERY_LAYOUT_BENCHMARK_COALESCE)'"
+	@$(COMPOSE) run --rm spark-submit "mkdir -p /tmp/spark-ivy/cache /tmp/spark-ivy/jars /tmp/spark-local && /opt/spark/bin/spark-submit --master spark://spark-master:7077 --conf spark.jars.ivy=/tmp/spark-ivy --packages org.apache.hadoop:hadoop-aws:3.3.4 benchmark/query/spark_layout_benchmark.py --manifest-path '$(MANIFEST)' --output-dir '$(QUERY_LAYOUT_BENCHMARK_OUTPUT_DIR)' --run-id '$(BENCHMARK_RUN_ID)' --iterations '$(QUERY_LAYOUT_BENCHMARK_ITERATIONS)' --warmup '$(QUERY_LAYOUT_BENCHMARK_WARMUP)' --comparison format --coalesce '$(QUERY_LAYOUT_BENCHMARK_COALESCE)'"
 
 benchmark-trino:
 	@python benchmark/query/trino_benchmark.py --output-dir "$(TRINO_BENCHMARK_OUTPUT_DIR)" --run-id "$(BENCHMARK_RUN_ID)" --iterations "$(TRINO_BENCHMARK_ITERATIONS)" --warmup "$(TRINO_BENCHMARK_WARMUP)"
