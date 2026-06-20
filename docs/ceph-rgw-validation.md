@@ -137,6 +137,38 @@ The query smoke runner completed all six Spark SQL queries:
 | `05_selective_pickup_date` | 1 | 2.026 |
 | `06_full_scan_location_aggregation` | 20 | 22.309 |
 
+## Trino Query Validation
+
+Trino was also validated against the Ceph-backed gold tables. Only the Trino
+container was started for this check to keep the Windows host memory usage low.
+
+Commands:
+
+```bash
+make trino-up
+make trino-smoke
+```
+
+The Trino setup step registered external tables over the gold Parquet outputs:
+
+```text
+s3://datalake-gold/daily_trip_metrics/year=2025/month=01
+s3://datalake-gold/location_metrics/year=2025/month=01
+s3://datalake-gold/payment_metrics/year=2025/month=01
+```
+
+Smoke query results:
+
+| Check | Result |
+|---|---:|
+| Daily metric rows | 33 |
+| Total trips | 3,328,747 |
+| Total revenue | 90,289,567.86 |
+| Payment type rows returned | 6 |
+
+This validates that Trino can use the Docker Compose S3 configuration to query
+Ceph RGW data through the same S3-compatible endpoint used by Spark.
+
 ## Ceph Storage Smoke Benchmark
 
 Two lightweight storage benchmark runs were executed against Ceph RGW. These
@@ -237,7 +269,8 @@ This validation proves that:
 - the bronze NYC Taxi source file can be uploaded to Ceph;
 - Spark running in Docker Compose can read from and write to Ceph through S3A;
 - silver and gold Parquet outputs are stored on Ceph;
-- Spark SQL can query the Ceph-backed silver/gold outputs.
+- Spark SQL can query the Ceph-backed silver/gold outputs;
+- Trino can register and query the Ceph-backed gold outputs.
 
 These results do not yet prove:
 
@@ -261,5 +294,5 @@ validation step.
 ## Next Steps
 
 1. Compare the expanded Ceph benchmark with the existing MinIO local baseline.
-2. Validate Trino against the Ceph-backed gold tables.
-3. Run one controlled fault-tolerance scenario if host resources allow it.
+2. Run one controlled fault-tolerance scenario if host resources allow it.
+3. Capture a final phase summary with commands, outputs, and limitations.
