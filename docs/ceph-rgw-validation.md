@@ -169,6 +169,78 @@ Smoke query results:
 This validates that Trino can use the Docker Compose S3 configuration to query
 Ceph RGW data through the same S3-compatible endpoint used by Spark.
 
+## Fault Tolerance Smoke Test
+
+A controlled single-node outage was tested by gracefully shutting down
+`hadoop-worker2` through VirtualBox while keeping `hadoop-master` and
+`hadoop-worker1` online. The RGW daemon remained on `hadoop-master`.
+
+Before the outage, the cluster was healthy:
+
+```text
+health: HEALTH_OK
+mon: 3 daemons, quorum hadoop-master,hadoop-worker1,hadoop-worker2
+osd: 3 osds: 3 up, 3 in
+pgs: 194 active+clean
+objects: 496 objects, 141 MiB
+```
+
+After `hadoop-worker2` was shut down, Ceph reported the expected degraded
+state:
+
+```text
+health: HEALTH_WARN
+mon: 3 daemons, quorum hadoop-master,hadoop-worker1, out of quorum: hadoop-worker2
+osd: 3 osds: 2 up, 3 in
+500/1500 objects degraded (33.333%)
+111 active+undersized
+83 active+undersized+degraded
+```
+
+The OSD tree showed `osd.2` down on `hadoop-worker2`, while `osd.0` and
+`osd.1` remained up:
+
+```text
+hadoop-master   osd.0 up
+hadoop-worker1  osd.1 up
+hadoop-worker2  osd.2 down
+```
+
+The S3-compatible endpoint remained usable during the outage. Both repository
+storage checks passed while `hadoop-worker2` was offline:
+
+```bash
+make health
+make storage-smoke
+```
+
+The smoke test confirmed bucket reachability, object upload, checksum
+verification, download, and deletion through RGW:
+
+```text
+reachable buckets: datalake-bronze, datalake-gold, datalake-silver, datalake-system
+uploaded: s3://datalake-system/smoke-tests/20260620T100255Z-ebf38ea1e55b.bin
+checksum ok: ebf38ea1e55b74df03c91fd4aac5cb3c3b7eb80bbb27ea9c54f96835f2da0747
+deleted: s3://datalake-system/smoke-tests/20260620T100255Z-ebf38ea1e55b.bin
+storage-smoke ok
+```
+
+After `hadoop-worker2` was restarted, network connectivity returned and the
+cluster recovered:
+
+```text
+ping hadoop-worker2: 3 transmitted, 3 received, 0% packet loss
+health: HEALTH_OK
+mon: 3 daemons, quorum hadoop-master,hadoop-worker1,hadoop-worker2
+osd: 3 osds: 3 up, 3 in
+pgs: 194 active+clean
+```
+
+This demonstrates that the 3-node lab cluster can tolerate a temporary
+single-node outage for demo purposes. During the outage, redundancy was reduced
+and Ceph correctly reported `HEALTH_WARN`, but quorum remained available and
+RGW continued serving S3 requests.
+
 ## Ceph Storage Smoke Benchmark
 
 Two lightweight storage benchmark runs were executed against Ceph RGW. These
@@ -276,7 +348,7 @@ These results do not yet prove:
 
 - stable Ceph throughput under repeated benchmark runs;
 - fair Ceph-vs-MinIO performance differences;
-- production-grade fault tolerance;
+- production-grade fault tolerance beyond a controlled single-node smoke test;
 - query performance under larger datasets or multi-client concurrency.
 
 ## Operational Notes
@@ -294,5 +366,5 @@ validation step.
 ## Next Steps
 
 1. Compare the expanded Ceph benchmark with the existing MinIO local baseline.
-2. Run one controlled fault-tolerance scenario if host resources allow it.
-3. Capture a final phase summary with commands, outputs, and limitations.
+2. Capture a final phase summary with commands, outputs, and limitations.
+3. Optionally repeat benchmarks with a more controlled host resource profile.
