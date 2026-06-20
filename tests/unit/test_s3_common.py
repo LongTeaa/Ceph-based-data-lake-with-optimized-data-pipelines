@@ -1,8 +1,10 @@
 from pathlib import Path
+import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from infrastructure.buckets.s3_common import load_dotenv, parse_bool
+from infrastructure.buckets.s3_common import apply_proxy_environment, load_dotenv, parse_bool
 
 
 class S3CommonTests(unittest.TestCase):
@@ -35,6 +37,30 @@ class S3CommonTests(unittest.TestCase):
         self.assertEqual(values["S3_ENDPOINT"], "http://localhost:9000")
         self.assertEqual(values["S3_ACCESS_KEY"], "minioadmin")
         self.assertEqual(values["S3_SECRET_KEY"], "minioadmin123")
+
+    def test_apply_proxy_environment_allows_dotenv_to_clear_host_proxy(self):
+        with patch.dict(
+            os.environ,
+            {
+                "HTTP_PROXY": "http://127.0.0.1:9",
+                "HTTPS_PROXY": "http://127.0.0.1:9",
+                "ALL_PROXY": "http://127.0.0.1:9",
+            },
+            clear=True,
+        ):
+            apply_proxy_environment(
+                {
+                    "NO_PROXY": "localhost,127.0.0.1,192.168.56.101",
+                    "HTTP_PROXY": "",
+                    "HTTPS_PROXY": "",
+                    "ALL_PROXY": "",
+                }
+            )
+
+            self.assertEqual(os.environ["NO_PROXY"], "localhost,127.0.0.1,192.168.56.101")
+            self.assertEqual(os.environ["HTTP_PROXY"], "")
+            self.assertEqual(os.environ["HTTPS_PROXY"], "")
+            self.assertEqual(os.environ["ALL_PROXY"], "")
 
 
 if __name__ == "__main__":

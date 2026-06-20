@@ -20,6 +20,17 @@ REQUIRED_CONFIG = (
     "SYSTEM_BUCKET",
 )
 
+PROXY_CONFIG = (
+    "NO_PROXY",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "no_proxy",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+)
+
 
 @dataclass(frozen=True)
 class S3Settings:
@@ -68,8 +79,15 @@ def parse_bool(value: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def apply_proxy_environment(dotenv_values: dict[str, str]) -> None:
+    for name in PROXY_CONFIG:
+        if name in dotenv_values:
+            os.environ[name] = dotenv_values[name]
+
+
 def load_settings() -> S3Settings:
     dotenv_values = load_dotenv()
+    apply_proxy_environment(dotenv_values)
     missing = [name for name in REQUIRED_CONFIG if not get_value(name, dotenv_values)]
     if missing:
         raise ValueError(
