@@ -206,8 +206,33 @@ hadoop-worker1  osd.1 up
 hadoop-worker2  osd.2 down
 ```
 
-The S3-compatible endpoint remained usable during the outage. Both repository
-storage checks passed while `hadoop-worker2` was offline:
+The S3-compatible endpoint and query path remained usable during the outage.
+Trino was able to query the Ceph-backed gold tables while `hadoop-worker2` was
+offline:
+
+```bash
+make trino-smoke
+```
+
+Trino returned the same gold-table smoke results that were observed before the
+outage:
+
+| Check | Result |
+|---|---:|
+| Daily metric rows | 33 |
+| Total trips | 3,328,747 |
+| Total revenue | 90,289,567.86 |
+| Payment type rows returned | 6 |
+
+The first rows returned by the daily metrics query included:
+
+```text
+"2024-12-31","21","589.17"
+"2025-01-01","82399","2374859.2"
+"2025-01-02","82037","2422974.36"
+```
+
+Both repository storage checks also passed while `hadoop-worker2` was offline:
 
 ```bash
 make health
@@ -219,9 +244,9 @@ verification, download, and deletion through RGW:
 
 ```text
 reachable buckets: datalake-bronze, datalake-gold, datalake-silver, datalake-system
-uploaded: s3://datalake-system/smoke-tests/20260620T100255Z-ebf38ea1e55b.bin
-checksum ok: ebf38ea1e55b74df03c91fd4aac5cb3c3b7eb80bbb27ea9c54f96835f2da0747
-deleted: s3://datalake-system/smoke-tests/20260620T100255Z-ebf38ea1e55b.bin
+uploaded: s3://datalake-system/smoke-tests/20260622T080807Z-700a1147b8c0.bin
+checksum ok: 700a1147b8c0d5aa3beacf6419aa9947fee59c4e84bad704bc498b8aefd8cf45
+deleted: s3://datalake-system/smoke-tests/20260622T080807Z-700a1147b8c0.bin
 storage-smoke ok
 ```
 
@@ -239,7 +264,9 @@ pgs: 194 active+clean
 This demonstrates that the 3-node lab cluster can tolerate a temporary
 single-node outage for demo purposes. During the outage, redundancy was reduced
 and Ceph correctly reported `HEALTH_WARN`, but quorum remained available and
-RGW continued serving S3 requests.
+RGW continued serving S3 requests. Trino could still query curated gold data
+from Ceph RGW, proving that the Data Lake remained usable for read-side
+analytics while one storage node was unavailable.
 
 ## Ceph Storage Smoke Benchmark
 
@@ -342,7 +369,9 @@ This validation proves that:
 - Spark running in Docker Compose can read from and write to Ceph through S3A;
 - silver and gold Parquet outputs are stored on Ceph;
 - Spark SQL can query the Ceph-backed silver/gold outputs;
-- Trino can register and query the Ceph-backed gold outputs.
+- Trino can register and query the Ceph-backed gold outputs;
+- Trino can still query Ceph-backed gold data during a controlled single-node
+  outage.
 
 These results do not yet prove:
 
