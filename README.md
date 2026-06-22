@@ -1,329 +1,376 @@
-# Ceph-based Data Lake with Optimized Data Pipelines
+﻿# Ceph-based Data Lake with Optimized Data Pipelines
 
-This repository is a student research project for building a Data Lake on
-Ceph Object Storage and evaluating distributed data pipelines.
+This repository implements a Data Lake architecture that uses Ceph Object Storage as the S3-compatible storage layer for ingestion, transformation, querying, and storage benchmarking.
 
-The target system uses Ceph RGW as an S3-compatible object storage layer,
-Spark for ETL/query, Airflow for orchestration, and Prometheus/Grafana for
-monitoring. The implementation roadmap is kept locally in `workflow.md`.
+The project validates a practical Data Lake pattern:
 
-## Current Status
+```text
+Source data -> bronze bucket -> Spark ETL -> silver/gold buckets -> Spark SQL / Trino
+                                      |
+                                      v
+                               Ceph RGW / S3 API
+```
 
-Phase 1 is complete for local S3-compatible storage, Phase 2 bronze ingestion
-and synthetic data generation are available, Phase 3 Spark ETL is available for
-NYC Taxi bronze, silver, and gold datasets, Phase 4 has a manual Airflow DAG
-that submits transform jobs to local Spark standalone, Phase 5 has a query
-layer with Spark SQL smoke/benchmark queries and an optional Trino service for
-SQL analytics over gold Parquet, Phase 6 has local Prometheus/Grafana
-monitoring for MinIO, Spark, and Airflow metrics, and Phase 7 has a lightweight
-S3 storage benchmark runner:
+Ceph RGW is the target object storage backend. MinIO is kept as a lightweight local baseline for development and comparison.
 
-- Repository skeleton exists.
-- Runtime configuration template exists in `.env.example`.
-- Local S3-compatible storage can be started with Docker Compose.
-- Bucket initialization and upload/download/checksum smoke tests are available.
-- NYC Taxi source manifest generation is available.
-- Deterministic synthetic tabular and binary data generators are available.
-- Idempotent bronze upload for manifest-described files is available.
-- NYC Taxi bronze-to-silver Spark transform is available.
-- NYC Taxi silver-to-gold Spark aggregations are available.
-- A manual-trigger Airflow DAG orchestrates config check, storage check,
-  bronze ingest, silver transform, and gold transform through Spark standalone.
-- Local Airflow services are available in Docker Compose.
-- Local Spark standalone master/worker services are available in Docker Compose.
-- Spark SQL smoke queries are available for NYC Taxi silver/gold outputs.
-- Trino can register and query NYC Taxi gold Parquet tables from MinIO.
-- Prometheus and Grafana can be started locally with provisioned scrape config,
-  datasource, and dashboard files.
-- A boto3-based S3 storage benchmark runner is available.
-- Dataset documentation is available in `docs/datasets.md`.
+## Highlights
+
+- Ceph RGW backed by a 3-node Ceph lab cluster.
+- S3-compatible bronze, silver, gold, and system buckets.
+- NYC Taxi ingestion workflow with manifest-based bronze upload.
+- Spark bronze-to-silver cleansing and silver-to-gold aggregations.
+- Spark SQL and Trino query checks over Ceph-backed Parquet data.
+- Docker Compose runtime for Spark, Airflow, Trino, MinIO, Prometheus, and Grafana.
+- Boto3-based S3 storage benchmark runner.
+- MinIO vs Ceph RGW lab comparison.
+- Fault-tolerance demo: one Ceph worker node down while Trino still queries gold data through RGW.
+
+## Architecture
+
+The validated Ceph lab uses three VirtualBox Ubuntu VMs:
+
+| Host | IP | Role |
+|---|---|---|
+| `hadoop-master` | `192.168.56.101` | Ceph host and RGW endpoint |
+| `hadoop-worker1` | `192.168.56.102` | Ceph host |
+| `hadoop-worker2` | `192.168.56.103` | Ceph host |
+
+Ceph provides the storage layer:
+
+- Ceph version: `18.2.8 reef`
+- Deployment: `cephadm`
+- MON quorum: 3 MONs
+- OSD layout: 3 OSDs, one virtual disk per VM
+- RGW endpoint: `http://192.168.56.101:7480`
+
+Docker Compose on the Windows host provides the compute and application layer:
+
+- Spark standalone for ETL and Spark SQL jobs
+- Trino for SQL analytics over gold Parquet data
+- Airflow for orchestration
+- Prometheus/Grafana for local monitoring experiments
+- MinIO for local S3-compatible development and baseline runs
+
+The S3 endpoint is configured through `.env`, so the same pipeline can point to MinIO or Ceph RGW without code changes.
+
+## Repository Layout
+
+```text
+airflow/            Airflow DAGs
+benchmark/          Storage and query benchmark runners
+data/               Local source data and generated inputs
+docker/             Docker Compose, Spark, Trino, Airflow, monitoring config
+docs/               Technical documentation, validation notes, runbooks
+generator/          Synthetic tabular and binary data generators
+ingestion/          Manifest generation and bronze upload utilities
+infrastructure/     Bucket, S3, and config helpers
+results/            Local pipeline metrics and query outputs
+spark/              PySpark jobs and shared Spark helpers
+tests/              Unit tests
+```
 
 ## Prerequisites
 
-For the current local workflow:
+Required for local development:
 
-- Git
 - Python 3.11+
-- GNU Make
 - Docker Desktop or Docker Engine with Compose v2
-- One local NYC Taxi Parquet file for bronze ingestion
+- GNU Make
+- Git
+- An NYC Taxi Parquet file, for example `data/source/nyc-taxi/yellow_tripdata_2025-01.parquet`
 
-For later phases:
+Required for Ceph validation:
 
-- A Ceph RGW endpoint or a Linux/Kubernetes environment for Ceph deployment
-- Enough disk space for NYC Taxi data and generated benchmark artifacts
-- Optional: 3 Linux VM/node environment for meaningful Ceph benchmark and
-  fault-tolerance experiments
+- A reachable Ceph RGW endpoint
+- S3 access key and secret key for an RGW user
+- Network access from the host and Docker containers to the RGW endpoint
 
-## Quick Start
+## Configuration
 
 Create a local environment file:
-
-```bash
-cp .env.example .env
-```
-
-On Windows PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
+For a Ceph RGW run, set the S3 values in `.env`:
+
+```env
+S3_ENDPOINT=http://192.168.56.101:7480
+S3_ACCESS_KEY=<your-rgw-access-key>
+S3_SECRET_KEY=<your-rgw-secret-key>
+S3_REGION=us-east-1
+S3_PATH_STYLE_ACCESS=true
+S3_USE_SSL=false
+BRONZE_BUCKET=datalake-bronze
+SILVER_BUCKET=datalake-silver
+GOLD_BUCKET=datalake-gold
+SYSTEM_BUCKET=datalake-system
+```
+
+If your Windows environment has a global proxy, make sure local Ceph VM addresses bypass it:
+
+```env
+NO_PROXY=localhost,127.0.0.1,192.168.56.101,192.168.56.102,192.168.56.103
+no_proxy=localhost,127.0.0.1,192.168.56.101,192.168.56.102,192.168.56.103
+```
+
+Do not commit `.env`; it may contain real credentials.
+
+## Install
+
 Install Python dependencies:
 
-```bash
+```powershell
 pip install -r requirements.txt
 ```
 
-Validate required configuration:
+Run syntax and unit checks:
 
-```bash
+```powershell
+make test
+```
+
+Validate required environment variables:
+
+```powershell
 make config-check
 ```
 
-Run local checks:
+## S3 Bucket Checks
 
-```bash
-make test
-make dag-check
-```
+Check the configured S3-compatible endpoint:
 
-Generate deterministic synthetic tabular and binary data:
-
-```bash
-make generate-test-data ROWS=10000 DAYS=7 SEED=42
-```
-
-Start local S3-compatible storage, create buckets, and run a smoke test:
-
-```bash
-make up
-make init-buckets
-make storage-smoke
+```powershell
 make health
 ```
 
-Start local Airflow services when you want to orchestrate the pipeline through
-the Airflow UI. This also starts Spark master/worker for transform tasks:
+Create the Data Lake buckets if needed:
 
-```bash
+```powershell
+make init-buckets
+```
+
+Run upload/download/checksum/delete smoke validation:
+
+```powershell
+make storage-smoke
+```
+
+## Data Ingestion
+
+Prepare the default NYC Taxi manifest:
+
+```powershell
+make prepare-nyc-taxi
+```
+
+Upload manifest-described files into the bronze bucket:
+
+```powershell
+make ingest
+```
+
+Default input:
+
+```text
+data/source/nyc-taxi/yellow_tripdata_2025-01.parquet
+```
+
+Default bronze location:
+
+```text
+s3://datalake-bronze/nyc-taxi/year=2025/month=01/yellow_tripdata_2025-01.parquet
+```
+
+## Spark ETL
+
+For low-memory machines, start only the Spark services before running ETL:
+
+```powershell
+make spark-up
+```
+
+Run bronze-to-silver:
+
+```powershell
+make spark-submit-silver
+```
+
+Run silver-to-gold:
+
+```powershell
+make spark-submit-gold
+```
+
+Output locations:
+
+```text
+s3://datalake-silver/nyc-taxi/year=2025/month=01
+s3://datalake-gold/daily_trip_metrics/year=2025/month=01
+s3://datalake-gold/location_metrics/year=2025/month=01
+s3://datalake-gold/payment_metrics/year=2025/month=01
+```
+
+Stop Spark when finished:
+
+```powershell
+make spark-down
+```
+
+## Query Validation
+
+Run Spark SQL smoke queries:
+
+```powershell
+make query-smoke
+```
+
+Run Trino against the Ceph-backed gold tables:
+
+```powershell
+make trino-up
+make trino-smoke
+make trino-down
+```
+
+The Trino UI is available while Trino is running:
+
+```text
+http://localhost:8083/ui/
+```
+
+## Airflow Orchestration
+
+The Airflow DAG orchestrates the same building blocks:
+
+```text
+check_config -> check_storage -> prepare_manifest -> upload_bronze
+             -> bronze_to_silver -> silver_to_gold
+```
+
+Start Airflow with Spark services:
+
+```powershell
 make airflow-up
 make airflow-dag-list
 ```
 
-Start local Spark standalone services when you want Spark master/worker instead
-of `local[*]`:
-
-```bash
-make spark-up
-make spark-submit-silver
-make spark-submit-gold
-```
-
-Prepare and ingest the default NYC Taxi source file:
-
-```bash
-make prepare-nyc-taxi
-make ingest
-```
-
-Transform bronze NYC Taxi data into silver and gold Parquet:
-
-```bash
-make transform
-```
-
-Run Spark SQL smoke queries against the silver/gold datasets:
-
-```bash
-make query-smoke
-```
-
-Run a small Spark SQL query benchmark:
-
-```bash
-make benchmark-query QUERY_BENCHMARK_WARMUP=0 QUERY_BENCHMARK_ITERATIONS=1
-```
-
-Compare partitioned and non-partitioned silver Parquet layouts:
-
-```bash
-make benchmark-query-layout QUERY_LAYOUT_BENCHMARK_WARMUP=0 QUERY_LAYOUT_BENCHMARK_ITERATIONS=1
-```
-
-Compare small-file and compacted silver Parquet layouts:
-
-```bash
-make benchmark-query-compaction QUERY_LAYOUT_BENCHMARK_WARMUP=0 QUERY_LAYOUT_BENCHMARK_ITERATIONS=1
-```
-
-Compare CSV and Parquet silver layouts:
-
-```bash
-make benchmark-query-format QUERY_LAYOUT_BENCHMARK_WARMUP=0 QUERY_LAYOUT_BENCHMARK_ITERATIONS=1
-```
-
-Start Trino and run SQL smoke queries against gold tables:
-
-```bash
-make trino-up
-make trino-smoke
-```
-
-Run a small Trino query benchmark:
-
-```bash
-make benchmark-trino TRINO_BENCHMARK_WARMUP=0 TRINO_BENCHMARK_ITERATIONS=1
-```
-
-Run a lightweight S3-compatible storage benchmark:
-
-```bash
-make benchmark-storage
-```
-
-Run a local end-to-end smoke workflow after storage and Spark are available:
-
-```bash
-make e2e-smoke
-```
-
-Use a one-operation smoke benchmark on small machines:
-
-```bash
-make benchmark-storage STORAGE_BENCHMARK_OBJECT_SIZES=4KiB STORAGE_BENCHMARK_CONCURRENCY=1 STORAGE_BENCHMARK_OPERATIONS=put STORAGE_BENCHMARK_WARMUP=0 STORAGE_BENCHMARK_ITERATIONS=1
-```
-
-Start local monitoring dashboards:
-
-```bash
-make monitoring-up
-```
-
-Prometheus is available at <http://localhost:9090>. Grafana is available at
-<http://localhost:3000> with the default local credentials from `.env`.
-
-Open an interactive Trino CLI:
-
-```bash
-make trino-cli
-```
-
-Stop local storage:
-
-```bash
-make down
-```
-
-If `make` is not installed, run the scripts directly:
-
-```bash
-python infrastructure/scripts/config_check.py S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY S3_REGION BRONZE_BUCKET SILVER_BUCKET GOLD_BUCKET SYSTEM_BUCKET
-python infrastructure/buckets/init_buckets.py
-python infrastructure/buckets/storage_smoke.py
-python ingestion/nyc_taxi_manifest.py --source-dir data/source/nyc-taxi --file-name yellow_tripdata_2025-01.parquet
-python ingestion/bronze_upload.py --manifest-path data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
-python spark/jobs/nyc_taxi_bronze_to_silver.py --manifest-path data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
-python spark/jobs/nyc_taxi_silver_to_gold.py --manifest-path data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
-```
-
-## Dataset Policy
-
-Large datasets are local-only and ignored by Git.
-
-Expected local paths:
-
-- NYC Yellow Taxi source Parquet: `data/source/nyc-taxi/`
-- Optional Wikimedia image dataset: `data/source/images/`
-- Pipeline outputs: `data/bronze/`, `data/silver/`, `data/gold/`
-- Benchmark output: `results/`
-
-Generate test/benchmark source data:
-
-```bash
-make generate-test-data ROWS=10000 DAYS=7 SEED=42
-```
-
-The main analytics dataset is NYC Yellow Taxi. Synthetic data is only for tests,
-scale experiments, and object-storage benchmark payloads.
-
-Prepare and ingest the NYC Taxi source file:
-
-```bash
-make prepare-nyc-taxi
-make ingest
-```
-
-The default source file is `data/source/nyc-taxi/yellow_tripdata_2025-01.parquet`.
-Override `SOURCE`, `FILE`, or `MANIFEST` from the command line when needed.
-
-See [docs/datasets.md](docs/datasets.md) for the expected local path, manifest
-format, and bronze layout.
-
-## Repository Layout
+Open the UI:
 
 ```text
-airflow/           Airflow DAGs and orchestration code
-benchmark/         Storage and query benchmark runners
-data/              Local source data, samples, and generated outputs
-docker/            Compose files and service configuration
-docs/              Technical documentation and runbooks
-generator/         Synthetic tabular/binary data generators
-ingestion/         Dataset preparation and upload utilities
-infrastructure/    Ceph, bucket, and environment bootstrap scripts
-spark/             PySpark jobs, SQL, and Spark configuration
-tests/             Unit and integration tests
+http://localhost:8080
 ```
 
-## Local Storage
+Stop Airflow services:
 
-Phase 1 uses MinIO as a lightweight local S3-compatible endpoint. This is only a
-development backend for validating bucket layout and S3 scripts. The same
-scripts are intended to run against Ceph RGW after changing `.env`.
+```powershell
+make airflow-down
+```
 
-See [docs/local-storage.md](docs/local-storage.md) for details.
-
-## Airflow
-
-Phase 4 includes a manual-trigger DAG for the NYC Taxi pipeline and local
-Airflow services in Docker Compose. The transform tasks use `spark-submit` to
-run on Spark standalone. See [docs/airflow.md](docs/airflow.md) for startup,
-credentials, parameters, and runtime notes.
-
-## Spark Standalone
-
-Phase 4 includes a local Spark master/worker runtime in Docker Compose. See
-[docs/spark.md](docs/spark.md) for startup commands, submit targets, container
-network settings, and validation order.
-
-## Query Layer
-
-Phase 5 starts with Spark SQL smoke queries over NYC Taxi silver/gold Parquet
-outputs, a lightweight Spark SQL benchmark runner, and Trino external tables
-over the gold layer with a Trino benchmark runner. See
-[docs/query.md](docs/query.md) for the query set, run commands, result metrics,
-and Trino usage.
-
-## Monitoring
-
-Phase 6 includes local Prometheus/Grafana provisioning for MinIO, Spark, and
-Airflow metrics. See [docs/monitoring.md](docs/monitoring.md) for startup
-commands, endpoints, dashboard details, and current Trino/Ceph limitations.
+On memory-constrained machines, prefer validating the task commands individually instead of running Airflow, Spark, Trino, and monitoring together.
 
 ## Storage Benchmark
 
-Phase 7 includes a boto3-based S3 PUT/GET/mixed benchmark runner with warm-up,
-concurrency, checksum validation, raw JSONL output, and CSV/JSON summaries. See
-[docs/storage-benchmark.md](docs/storage-benchmark.md) for run commands,
-scenario parameters, and output format.
+Run the default S3-compatible benchmark:
 
-## Local Validation
+```powershell
+make benchmark-storage
+```
 
-Current local validation results, including `make test`, `make e2e-smoke`,
-Airflow DAG success, and Phase 8 query benchmark baselines, are summarized in
-[docs/local-validation.md](docs/local-validation.md).
+Example Ceph RGW baseline run:
 
-## Next Phase
+```powershell
+make benchmark-storage BENCHMARK_RUN_ID=ceph-3vm-baseline STORAGE_BENCHMARK_BACKEND=ceph-rgw STORAGE_BENCHMARK_OBJECT_SIZES=1MiB STORAGE_BENCHMARK_CONCURRENCY=1,4 STORAGE_BENCHMARK_OPERATIONS=put,get,mixed STORAGE_BENCHMARK_WARMUP=1 STORAGE_BENCHMARK_ITERATIONS=3
+```
 
-Continue by running storage benchmarks against local MinIO and then a real Ceph
-RGW endpoint with the same benchmark matrix.
+Results are written under:
+
+```text
+benchmark/results/<run-id>/storage/s3/<timestamp>/
+```
+
+## Fault-Tolerance Demo
+
+The key Ceph demo is a controlled single-node outage:
+
+1. Start from `HEALTH_OK`.
+2. Query gold data with Trino.
+3. Gracefully shut down `hadoop-worker2`.
+4. Confirm Ceph reports `HEALTH_WARN`, `osd.2 down`, and degraded redundancy.
+5. Run `make trino-smoke` again.
+6. Confirm Trino still returns gold data from Ceph RGW.
+7. Run `make health` and `make storage-smoke`.
+8. Restart `hadoop-worker2`.
+9. Confirm Ceph recovers to `HEALTH_OK`.
+
+This demonstrates that Ceph remains usable for read-side analytics while one storage node is unavailable, although redundancy is temporarily reduced.
+
+## Monitoring
+
+Start the local monitoring stack:
+
+```powershell
+make monitoring-up
+```
+
+Endpoints:
+
+```text
+Prometheus: http://localhost:9090
+Grafana:    http://localhost:3000
+```
+
+Stop monitoring:
+
+```powershell
+make monitoring-down
+```
+
+The repo monitoring stack is mainly for the Docker-based application runtime. Ceph also exposes its own dashboard and Prometheus endpoint through the Ceph manager.
+
+## Documentation
+
+Important docs:
+
+- [docs/ceph-positioning.md](docs/ceph-positioning.md): why Ceph, when to use it, and how to explain Ceph vs MinIO.
+- [docs/ceph-rgw-validation.md](docs/ceph-rgw-validation.md): Ceph RGW validation results, including Trino query during node outage.
+- [docs/ceph-transition-summary.md](docs/ceph-transition-summary.md): summary of the transition from MinIO-only local storage to Ceph RGW.
+- [docs/storage-backend-comparison.md](docs/storage-backend-comparison.md): MinIO vs Ceph RGW lab benchmark interpretation.
+- [docs/datasets.md](docs/datasets.md): dataset paths and manifest format.
+- [docs/spark.md](docs/spark.md): Spark runtime notes.
+- [docs/query.md](docs/query.md): Spark SQL and Trino query layer.
+- [docs/airflow.md](docs/airflow.md): Airflow DAG and runtime notes.
+- [docs/monitoring.md](docs/monitoring.md): Prometheus/Grafana notes.
+- [docs/storage-benchmark.md](docs/storage-benchmark.md): storage benchmark runner details.
+
+## Current Validation Summary
+
+The repository has been validated against a 3-VM Ceph RGW lab:
+
+| Area | Result |
+|---|---|
+| S3 health check | Passed |
+| S3 storage smoke | Passed |
+| Bronze upload | Passed |
+| Spark bronze-to-silver | Passed |
+| Spark silver-to-gold | Passed |
+| Spark SQL query smoke | Passed |
+| Trino gold query smoke | Passed |
+| Trino query during one-node outage | Passed |
+| Ceph recovery after node restart | Returned to `HEALTH_OK` |
+
+The benchmark results are lab baselines, not production performance claims. MinIO is faster in the local laptop benchmark, while Ceph demonstrates the distributed storage behavior: replication, degraded operation, and recovery.
+
+## Operational Notes
+
+- Keep `.env` local and uncommitted.
+- Start only the services needed for the current validation step.
+- Avoid running Airflow, Spark, Trino, Prometheus, and Grafana all at once on memory-constrained machines.
+- Check Ceph health before running pipeline or benchmark commands:
+
+```bash
+sudo cephadm shell -- ceph -s
+```
+
+- After a VM reboot or host sleep, wait for Ceph to return to `HEALTH_OK` before running performance-sensitive tests.
