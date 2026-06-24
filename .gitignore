@@ -82,7 +82,6 @@ postgres-data/
 *.orc
 *.jpg
 *.jpeg
-*.png
 *.webp
 *.bin
 

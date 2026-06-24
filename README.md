@@ -1,28 +1,73 @@
-﻿# Ceph-based Data Lake with Optimized Data Pipelines
+﻿<div align="center">
 
-This repository implements a Data Lake architecture that uses Ceph Object Storage as the S3-compatible storage layer for ingestion, transformation, querying, and storage benchmarking.
+# Ceph-based Data Lake with Optimized Data Pipelines
 
-The project validates a practical Data Lake pattern:
+<p>
+  <b>Distributed Data Lake on Ceph Object Storage</b><br/>
+  Bronze/Silver/Gold data pipeline with Spark, Trino, Airflow, and S3-compatible storage benchmarking.
+</p>
 
-```text
-Source data -> bronze bucket -> Spark ETL -> silver/gold buckets -> Spark SQL / Trino
-                                      |
-                                      v
-                               Ceph RGW / S3 API
-```
+<p>
+  <img alt="Ceph" src="https://img.shields.io/badge/storage-Ceph%20RGW-ef4444?style=for-the-badge" />
+  <img alt="Spark" src="https://img.shields.io/badge/processing-Apache%20Spark-f97316?style=for-the-badge" />
+  <img alt="Trino" src="https://img.shields.io/badge/query-Trino-8b5cf6?style=for-the-badge" />
+  <img alt="Airflow" src="https://img.shields.io/badge/orchestration-Airflow-0ea5e9?style=for-the-badge" />
+  <img alt="Docker Compose" src="https://img.shields.io/badge/runtime-Docker%20Compose-2563eb?style=for-the-badge" />
+</p>
+
+</div>
+
+---
+
+## Overview
+
+This repository implements a Data Lake architecture that uses **Ceph Object Storage** as the S3-compatible storage layer for ingestion, transformation, querying, and storage benchmarking.
 
 Ceph RGW is the target object storage backend. MinIO is kept as a lightweight local baseline for development and comparison.
+
+<div align="center">
+  <a href="docs/architecture.png">
+    <img src="docs/architecture.png" alt="Ceph-based Data Lake architecture" width="96%" />
+  </a>
+  <br/>
+  <sub><b>Architecture overview:</b> Airflow orchestration, Spark ETL, Trino/Spark SQL analytics, Ceph RGW S3 API, Bronze/Silver/Gold buckets, monitoring, and fault-tolerant Ceph storage.</sub>
+</div>
+
+## What This Project Demonstrates
+
+<table>
+  <tr>
+    <td><b>Ceph as Data Lake Storage</b></td>
+    <td>Ceph RGW provides the S3-compatible storage backbone for bronze, silver, gold, and system buckets.</td>
+  </tr>
+  <tr>
+    <td><b>Distributed Pipeline</b></td>
+    <td>Python ingestion and Spark jobs transform NYC Taxi data from raw bronze files into cleaned silver and curated gold Parquet outputs.</td>
+  </tr>
+  <tr>
+    <td><b>Analytics on Object Storage</b></td>
+    <td>Trino and Spark SQL query Ceph-backed Parquet data directly through the S3-compatible API.</td>
+  </tr>
+  <tr>
+    <td><b>Fault Tolerance</b></td>
+    <td>A Ceph worker node can be shut down while Trino still queries gold data through RGW; Ceph later recovers to <code>HEALTH_OK</code>.</td>
+  </tr>
+  <tr>
+    <td><b>Benchmarking</b></td>
+    <td>A boto3 runner measures S3 PUT/GET/mixed workloads and compares the local MinIO baseline with the Ceph RGW lab.</td>
+  </tr>
+</table>
 
 ## Highlights
 
 - Ceph RGW backed by a 3-node Ceph lab cluster.
 - S3-compatible bronze, silver, gold, and system buckets.
-- NYC Taxi ingestion workflow with manifest-based bronze upload.
+- NYC Taxi and synthetic data sources.
+- Manifest-based bronze ingestion.
 - Spark bronze-to-silver cleansing and silver-to-gold aggregations.
 - Spark SQL and Trino query checks over Ceph-backed Parquet data.
 - Docker Compose runtime for Spark, Airflow, Trino, MinIO, Prometheus, and Grafana.
 - Boto3-based S3 storage benchmark runner.
-- MinIO vs Ceph RGW lab comparison.
 - Fault-tolerance demo: one Ceph worker node down while Trino still queries gold data through RGW.
 
 ## Architecture
@@ -31,9 +76,9 @@ The validated Ceph lab uses three VirtualBox Ubuntu VMs:
 
 | Host | IP | Role |
 |---|---|---|
-| `hadoop-master` | `192.168.56.101` | Ceph host and RGW endpoint |
-| `hadoop-worker1` | `192.168.56.102` | Ceph host |
-| `hadoop-worker2` | `192.168.56.103` | Ceph host |
+| `hadoop-master` | `192.168.56.101` | Ceph host, MON, OSD.0, RGW endpoint |
+| `hadoop-worker1` | `192.168.56.102` | Ceph host, MON, OSD.1 |
+| `hadoop-worker2` | `192.168.56.103` | Ceph host, MON, OSD.2 |
 
 Ceph provides the storage layer:
 
@@ -331,34 +376,47 @@ The repo monitoring stack is mainly for the Docker-based application runtime. Ce
 
 ## Documentation
 
-Important docs:
-
-- [docs/ceph-positioning.md](docs/ceph-positioning.md): why Ceph, when to use it, and how to explain Ceph vs MinIO.
-- [docs/ceph-rgw-validation.md](docs/ceph-rgw-validation.md): Ceph RGW validation results, including Trino query during node outage.
-- [docs/ceph-transition-summary.md](docs/ceph-transition-summary.md): summary of the transition from MinIO-only local storage to Ceph RGW.
-- [docs/storage-backend-comparison.md](docs/storage-backend-comparison.md): MinIO vs Ceph RGW lab benchmark interpretation.
-- [docs/datasets.md](docs/datasets.md): dataset paths and manifest format.
-- [docs/spark.md](docs/spark.md): Spark runtime notes.
-- [docs/query.md](docs/query.md): Spark SQL and Trino query layer.
-- [docs/airflow.md](docs/airflow.md): Airflow DAG and runtime notes.
-- [docs/monitoring.md](docs/monitoring.md): Prometheus/Grafana notes.
-- [docs/storage-benchmark.md](docs/storage-benchmark.md): storage benchmark runner details.
+<table>
+  <tr>
+    <td><a href="docs/ceph-positioning.md"><b>Ceph Positioning</b></a></td>
+    <td>Why Ceph, when to use it, and how to explain Ceph vs MinIO.</td>
+  </tr>
+  <tr>
+    <td><a href="docs/ceph-rgw-validation.md"><b>Ceph RGW Validation</b></a></td>
+    <td>Validation results, including Trino query during node outage.</td>
+  </tr>
+  <tr>
+    <td><a href="docs/ceph-transition-summary.md"><b>Transition Summary</b></a></td>
+    <td>Summary of moving from MinIO-only local storage to Ceph RGW.</td>
+  </tr>
+  <tr>
+    <td><a href="docs/storage-backend-comparison.md"><b>Storage Backend Comparison</b></a></td>
+    <td>MinIO vs Ceph RGW lab benchmark interpretation.</td>
+  </tr>
+  <tr>
+    <td><a href="docs/datasets.md"><b>Datasets</b></a></td>
+    <td>Dataset paths, source files, and manifest format.</td>
+  </tr>
+  <tr>
+    <td><a href="docs/query.md"><b>Query Layer</b></a></td>
+    <td>Spark SQL and Trino query usage.</td>
+  </tr>
+</table>
 
 ## Current Validation Summary
 
-The repository has been validated against a 3-VM Ceph RGW lab:
-
-| Area | Result |
-|---|---|
-| S3 health check | Passed |
-| S3 storage smoke | Passed |
-| Bronze upload | Passed |
-| Spark bronze-to-silver | Passed |
-| Spark silver-to-gold | Passed |
-| Spark SQL query smoke | Passed |
-| Trino gold query smoke | Passed |
-| Trino query during one-node outage | Passed |
-| Ceph recovery after node restart | Returned to `HEALTH_OK` |
+<table>
+  <tr><th>Area</th><th>Result</th></tr>
+  <tr><td>S3 health check</td><td>Passed</td></tr>
+  <tr><td>S3 storage smoke</td><td>Passed</td></tr>
+  <tr><td>Bronze upload</td><td>Passed</td></tr>
+  <tr><td>Spark bronze-to-silver</td><td>Passed</td></tr>
+  <tr><td>Spark silver-to-gold</td><td>Passed</td></tr>
+  <tr><td>Spark SQL query smoke</td><td>Passed</td></tr>
+  <tr><td>Trino gold query smoke</td><td>Passed</td></tr>
+  <tr><td>Trino query during one-node outage</td><td>Passed</td></tr>
+  <tr><td>Ceph recovery after node restart</td><td>Returned to <code>HEALTH_OK</code></td></tr>
+</table>
 
 The benchmark results are lab baselines, not production performance claims. MinIO is faster in the local laptop benchmark, while Ceph demonstrates the distributed storage behavior: replication, degraded operation, and recovery.
 
