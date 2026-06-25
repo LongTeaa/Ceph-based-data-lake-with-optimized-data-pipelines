@@ -61,6 +61,7 @@ Ceph RGW is the target object storage backend. MinIO is kept as a lightweight lo
 ## Highlights
 
 - Ceph RGW backed by a 3-node Ceph lab cluster.
+- CephFS and RBD mini demos to show Ceph file and block storage capabilities beyond S3.
 - S3-compatible bronze, silver, gold, and system buckets.
 - NYC Taxi and synthetic data sources.
 - Manifest-based bronze ingestion.
@@ -386,6 +387,10 @@ The repo monitoring stack is mainly for the Docker-based application runtime. Ce
     <td>Validation results, including Trino query during node outage.</td>
   </tr>
   <tr>
+    <td><a href="docs/cephfs-rbd-demo.md"><b>CephFS and RBD Demo</b></a></td>
+    <td>Ceph file storage and block storage demos beyond the RGW/S3 path.</td>
+  </tr>
+  <tr>
     <td><a href="docs/ceph-transition-summary.md"><b>Transition Summary</b></a></td>
     <td>Summary of moving from MinIO-only local storage to Ceph RGW.</td>
   </tr>
@@ -416,6 +421,8 @@ The repo monitoring stack is mainly for the Docker-based application runtime. Ce
   <tr><td>Trino gold query smoke</td><td>Passed</td></tr>
   <tr><td>Trino query during one-node outage</td><td>Passed</td></tr>
   <tr><td>Ceph recovery after node restart</td><td>Returned to <code>HEALTH_OK</code></td></tr>
+  <tr><td>CephFS shared filesystem demo</td><td>Passed</td></tr>
+  <tr><td>RBD block storage demo</td><td>Passed</td></tr>
 </table>
 
 The benchmark results are lab baselines, not production performance claims. MinIO is faster in the local laptop benchmark, while Ceph demonstrates the distributed storage behavior: replication, degraded operation, and recovery.
