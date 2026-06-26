@@ -32,6 +32,7 @@ class NYCTaxiBatch:
     silver_bucket: str
     source_key: str
     source_uri: str
+    source_uris: tuple[str, ...]
     silver_prefix: str
     silver_uri: str
 
@@ -58,14 +59,15 @@ def batch_from_manifest(manifest: dict[str, Any], silver_bucket: str) -> NYCTaxi
     if manifest.get("dataset") != "nyc_taxi":
         raise ValueError(f"Unsupported dataset: {manifest.get('dataset')}")
     files = manifest.get("files") or []
-    if len(files) != 1:
-        raise ValueError("NYC Taxi manifest must describe exactly one source file")
+    if not files:
+        raise ValueError("NYC Taxi manifest must describe at least one source file")
 
     source = files[0]
     year = str(manifest["year"])
     month = str(manifest["month"])
     silver_prefix = f"nyc-taxi/year={year}/month={month}"
     source_key = source["bronze_key"]
+    source_uris = tuple(s3_uri(manifest["bronze_bucket"], item["bronze_key"]) for item in files)
 
     return NYCTaxiBatch(
         dataset=manifest["dataset"],
@@ -75,7 +77,8 @@ def batch_from_manifest(manifest: dict[str, Any], silver_bucket: str) -> NYCTaxi
         bronze_bucket=manifest["bronze_bucket"],
         silver_bucket=silver_bucket,
         source_key=source_key,
-        source_uri=s3_uri(manifest["bronze_bucket"], source_key),
+        source_uri=source_uris[0],
+        source_uris=source_uris,
         silver_prefix=silver_prefix,
         silver_uri=s3_uri(silver_bucket, silver_prefix),
     )

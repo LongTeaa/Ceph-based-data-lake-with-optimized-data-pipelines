@@ -41,6 +41,43 @@ class NYCTaxiSparkCommonTests(unittest.TestCase):
         )
         self.assertEqual(batch.silver_prefix, "nyc-taxi/year=2025/month=01")
         self.assertEqual(batch.silver_uri, "s3a://datalake-silver/nyc-taxi/year=2025/month=01")
+        self.assertEqual(
+            batch.source_uris,
+            ("s3a://datalake-bronze/nyc-taxi/year=2025/month=01/yellow_tripdata_2025-01.parquet",),
+        )
+
+    def test_batch_from_manifest_accepts_multi_file_scale_manifest(self):
+        manifest = {
+            "dataset": "nyc_taxi",
+            "taxi_type": "yellow",
+            "year": "scale",
+            "month": "2023-01_2023-02_2files",
+            "bronze_bucket": "datalake-bronze",
+            "bronze_prefix": "nyc-taxi/scale/2023-01_2023-02_2files",
+            "files": [
+                {
+                    "bronze_key": "nyc-taxi/year=2023/month=01/yellow_tripdata_2023-01.parquet",
+                },
+                {
+                    "bronze_key": "nyc-taxi/year=2023/month=02/yellow_tripdata_2023-02.parquet",
+                },
+            ],
+        }
+
+        batch = batch_from_manifest(manifest, "datalake-silver")
+
+        self.assertEqual(
+            batch.source_uris,
+            (
+                "s3a://datalake-bronze/nyc-taxi/year=2023/month=01/yellow_tripdata_2023-01.parquet",
+                "s3a://datalake-bronze/nyc-taxi/year=2023/month=02/yellow_tripdata_2023-02.parquet",
+            ),
+        )
+        self.assertEqual(batch.source_uri, batch.source_uris[0])
+        self.assertEqual(
+            batch.silver_uri,
+            "s3a://datalake-silver/nyc-taxi/year=scale/month=2023-01_2023-02_2files",
+        )
 
     def test_missing_required_columns_returns_ordered_missing_columns(self):
         missing = missing_required_columns(["tpep_pickup_datetime", "fare_amount"])

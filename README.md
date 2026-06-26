@@ -403,6 +403,10 @@ The repo monitoring stack is mainly for the Docker-based application runtime. Ce
     <td>Dataset paths, source files, and manifest format.</td>
   </tr>
   <tr>
+    <td><a href="docs/nyc-taxi-scale-validation.md"><b>NYC Taxi Scale Validation</b></a></td>
+    <td>Multi-file real NYC Taxi scale run on Ceph RGW with Spark ETL and query metrics.</td>
+  </tr>
+  <tr>
     <td><a href="docs/query.md"><b>Query Layer</b></a></td>
     <td>Spark SQL and Trino query usage.</td>
   </tr>
@@ -418,6 +422,7 @@ The repo monitoring stack is mainly for the Docker-based application runtime. Ce
   <tr><td>Spark bronze-to-silver</td><td>Passed</td></tr>
   <tr><td>Spark silver-to-gold</td><td>Passed</td></tr>
   <tr><td>Spark SQL query smoke</td><td>Passed</td></tr>
+  <tr><td>NYC Taxi multi-file scale run</td><td>Passed with 3 real files, 9,384,487 input rows</td></tr>
   <tr><td>Trino gold query smoke</td><td>Passed</td></tr>
   <tr><td>Trino query during one-node outage</td><td>Passed</td></tr>
   <tr><td>Ceph recovery after node restart</td><td>Returned to <code>HEALTH_OK</code></td></tr>

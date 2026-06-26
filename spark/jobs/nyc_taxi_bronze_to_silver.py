@@ -26,6 +26,15 @@ from spark.jobs.nyc_taxi_common import (
 
 JOB_NAME = "nyc_taxi_bronze_to_silver"
 DEFAULT_SPARK_JARS_PACKAGES = "org.apache.hadoop:hadoop-aws:3.3.4"
+DEDUP_COLUMNS = [
+    "pickup_datetime",
+    "dropoff_datetime",
+    "pu_location_id",
+    "do_location_id",
+    "passenger_count",
+    "trip_distance",
+    "total_amount",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -165,17 +174,25 @@ def clean_nyc_taxi_dataframe(df):
         & (F.col("total_amount") >= 0)
     )
 
-    return valid.dropDuplicates(
-        [
-            "pickup_datetime",
-            "dropoff_datetime",
-            "pu_location_id",
-            "do_location_id",
-            "passenger_count",
-            "trip_distance",
-            "total_amount",
-        ]
-    )
+    return valid.dropDuplicates(DEDUP_COLUMNS)
+
+
+def union_clean_nyc_taxi_files(spark, source_uris: tuple[str, ...]):
+    cleaned_frames = []
+    input_rows = 0
+    for source_uri in source_uris:
+        source_df = spark.read.parquet(source_uri)
+        input_rows += source_df.count()
+        cleaned_frames.append(clean_nyc_taxi_dataframe(source_df))
+
+    if not cleaned_frames:
+        raise ValueError("At least one NYC Taxi source URI is required")
+
+    silver_df = cleaned_frames[0]
+    for cleaned_df in cleaned_frames[1:]:
+        silver_df = silver_df.unionByName(cleaned_df, allowMissingColumns=True)
+
+    return input_rows, silver_df.dropDuplicates(DEDUP_COLUMNS)
 
 
 def write_metrics(path: Path, metrics: dict[str, Any]) -> None:
@@ -192,9 +209,7 @@ def run_transform(manifest_path: Path, output_dir: Path, mode: str) -> dict[str,
     spark = create_spark_session()
     try:
         configure_s3a(spark, settings)
-        bronze_df = spark.read.parquet(batch.source_uri)
-        input_rows = bronze_df.count()
-        silver_df = clean_nyc_taxi_dataframe(bronze_df)
+        input_rows, silver_df = union_clean_nyc_taxi_files(spark, batch.source_uris)
         output_rows = silver_df.count()
 
         (
@@ -211,6 +226,8 @@ def run_transform(manifest_path: Path, output_dir: Path, mode: str) -> dict[str,
             "year": batch.year,
             "month": batch.month,
             "bronze_uri": batch.source_uri,
+            "bronze_uris": list(batch.source_uris),
+            "source_file_count": len(batch.source_uris),
             "silver_uri": batch.silver_uri,
             "input_rows": input_rows,
             "output_rows": output_rows,

@@ -1,10 +1,14 @@
-.PHONY: help config-check env-check lint test dag-check health up down airflow-up airflow-down airflow-logs airflow-dag-list spark-up spark-down spark-logs spark-submit-silver spark-submit-gold trino-up trino-down trino-logs trino-setup trino-smoke trino-cli monitoring-up monitoring-down monitoring-logs init-buckets storage-smoke generate-test-data generate-tabular-data generate-binary-data prepare-nyc-taxi ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query benchmark-query-layout benchmark-query-compaction benchmark-query-format benchmark-trino e2e-smoke
+.PHONY: help config-check env-check lint test dag-check health up down airflow-up airflow-down airflow-logs airflow-dag-list spark-up spark-down spark-logs spark-submit-silver spark-submit-gold trino-up trino-down trino-logs trino-setup trino-smoke trino-cli monitoring-up monitoring-down monitoring-logs init-buckets storage-smoke generate-test-data generate-tabular-data generate-binary-data prepare-nyc-taxi download-nyc-taxi-scale ingest transform transform-silver transform-gold publish query-smoke benchmark-storage benchmark-query benchmark-query-layout benchmark-query-compaction benchmark-query-format benchmark-trino e2e-smoke
 
 REQUIRED_ENV := S3_ENDPOINT S3_ACCESS_KEY S3_SECRET_KEY S3_REGION BRONZE_BUCKET SILVER_BUCKET GOLD_BUCKET SYSTEM_BUCKET
 COMPOSE := docker compose --env-file .env -f docker/compose.yml
 SOURCE ?= data/source/nyc-taxi
 FILE ?= yellow_tripdata_2025-01.parquet
 MANIFEST ?= data/source/nyc-taxi/manifests/yellow_tripdata_2025-01.manifest.json
+NYC_TAXI_SCALE_MONTHS ?=
+NYC_TAXI_SCALE_LIMIT_FILES ?= 0
+NYC_TAXI_SCALE_OUTPUT_DIR ?= data/source/nyc-taxi/scale
+NYC_TAXI_SCALE_MANIFEST ?= data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2025-06_30files.manifest.json
 OUTPUT_DIR ?= results
 TRANSFORM_MODE ?= overwrite
 QUERY_BENCHMARK_ITERATIONS ?= 3
@@ -55,6 +59,7 @@ help:
 	@echo "  make test               Run available tests"
 	@echo "  make generate-test-data Generate deterministic synthetic tabular and binary data"
 	@echo "  make prepare-nyc-taxi   Create NYC Taxi source manifest"
+	@echo "  make download-nyc-taxi-scale Download 30 NYC Taxi files and create a scale manifest"
 	@echo "  make ingest             Upload manifest-described files to bronze"
 	@echo "  make transform          Transform NYC Taxi bronze to silver and gold"
 	@echo "  make transform-silver   Transform NYC Taxi bronze data to silver"
@@ -74,10 +79,10 @@ config-check:
 env-check: config-check
 
 lint:
-	@python -c "from pathlib import Path; files=['generator/generate_test_records.py','generator/generate_binary_objects.py','ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','benchmark/query/spark_layout_benchmark.py','benchmark/query/trino_benchmark.py','benchmark/storage/s3_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
+	@python -c "from pathlib import Path; files=['generator/generate_test_records.py','generator/generate_binary_objects.py','ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/download_nyc_taxi_scale.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','benchmark/query/spark_layout_benchmark.py','benchmark/query/trino_benchmark.py','benchmark/storage/s3_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
 
 test:
-	@python -c "from pathlib import Path; files=['generator/generate_test_records.py','generator/generate_binary_objects.py','ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','benchmark/query/spark_layout_benchmark.py','benchmark/query/trino_benchmark.py','benchmark/storage/s3_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
+	@python -c "from pathlib import Path; files=['generator/generate_test_records.py','generator/generate_binary_objects.py','ingestion/download_wikimedia_images.py','ingestion/nyc_taxi_manifest.py','ingestion/download_nyc_taxi_scale.py','ingestion/bronze_upload.py','spark/jobs/nyc_taxi_common.py','spark/jobs/nyc_taxi_bronze_to_silver.py','spark/jobs/nyc_taxi_silver_to_gold.py','spark/jobs/nyc_taxi_query_smoke.py','benchmark/query/spark_sql_benchmark.py','benchmark/query/spark_layout_benchmark.py','benchmark/query/trino_benchmark.py','benchmark/storage/s3_benchmark.py','airflow/dags/nyc_taxi_pipeline.py','infrastructure/scripts/config_check.py','infrastructure/buckets/s3_common.py','infrastructure/buckets/init_buckets.py','infrastructure/buckets/storage_smoke.py']; [compile(Path(f).read_text(encoding='utf-8'), f, 'exec') for f in files]; print('syntax ok')"
 	@python -m unittest discover -s tests/unit
 	@echo "Available syntax and unit checks passed."
 
@@ -163,6 +168,9 @@ generate-binary-data:
 
 prepare-nyc-taxi:
 	@python ingestion/nyc_taxi_manifest.py --source-dir "$(SOURCE)" --file-name "$(FILE)" --manifest-path "$(MANIFEST)"
+
+download-nyc-taxi-scale: config-check
+	@python ingestion/download_nyc_taxi_scale.py --output-dir "$(NYC_TAXI_SCALE_OUTPUT_DIR)" --manifest-path "$(NYC_TAXI_SCALE_MANIFEST)" $(if $(NYC_TAXI_SCALE_MONTHS),--months "$(NYC_TAXI_SCALE_MONTHS)") $(if $(filter-out 0,$(NYC_TAXI_SCALE_LIMIT_FILES)),--limit-files "$(NYC_TAXI_SCALE_LIMIT_FILES)")
 
 ingest: config-check
 	@python ingestion/bronze_upload.py --manifest-path "$(MANIFEST)"
