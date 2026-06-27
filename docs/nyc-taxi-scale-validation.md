@@ -30,19 +30,22 @@ CloudFront data endpoint:
 https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_YYYY-MM.parquet
 ```
 
-The first safe scale run used three months:
+The latest resource-safe end-to-end scale run used six months:
 
 | Month | Rows | Local file size |
 |---|---:|---:|
 | `2023-01` | 3,066,766 | 47,673,370 bytes |
 | `2023-02` | 2,913,955 | 47,748,012 bytes |
 | `2023-03` | 3,403,766 | 56,127,762 bytes |
-| **Total** | **9,384,487** | **151,549,144 bytes** |
+| `2023-04` | 3,288,250 | 54,222,699 bytes |
+| `2023-05` | 3,513,649 | 58,654,627 bytes |
+| `2023-06` | 3,307,234 | 54,999,465 bytes |
+| **Total** | **19,493,620** | **319,425,935 bytes** |
 
 Manifest:
 
 ```text
-data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2023-03_3files.manifest.json
+data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2023-06_6files.manifest.json
 ```
 
 Because `data/source/*` is ignored, this manifest is local run evidence unless
@@ -50,16 +53,16 @@ it is intentionally force-added for a report artifact.
 
 ## Commands
 
-Download the first three files and create the multi-file manifest:
+Download the first six files and create the multi-file manifest:
 
 ```powershell
-make download-nyc-taxi-scale NYC_TAXI_SCALE_LIMIT_FILES=3 NYC_TAXI_SCALE_MANIFEST=data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2023-03_3files.manifest.json
+make download-nyc-taxi-scale NYC_TAXI_SCALE_LIMIT_FILES=6 NYC_TAXI_SCALE_MANIFEST=data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2023-06_6files.manifest.json
 ```
 
 Upload the manifest-described files to Ceph bronze:
 
 ```powershell
-make ingest MANIFEST=data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2023-03_3files.manifest.json
+make ingest MANIFEST=data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2023-06_6files.manifest.json
 ```
 
 Start Spark with a low-memory profile:
@@ -76,9 +79,9 @@ make spark-up
 Run the scaled pipeline:
 
 ```powershell
-make spark-submit-silver MANIFEST=data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2023-03_3files.manifest.json OUTPUT_DIR=results-scale
-make spark-submit-gold MANIFEST=data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2023-03_3files.manifest.json OUTPUT_DIR=results-scale
-make query-smoke MANIFEST=data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2023-03_3files.manifest.json OUTPUT_DIR=results-scale
+make spark-submit-silver MANIFEST=data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2023-06_6files.manifest.json OUTPUT_DIR=results-scale
+make spark-submit-gold MANIFEST=data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2023-06_6files.manifest.json OUTPUT_DIR=results-scale
+make query-smoke MANIFEST=data/source/nyc-taxi/manifests/yellow_tripdata_2023-01_2023-06_6files.manifest.json OUTPUT_DIR=results-scale
 ```
 
 Stop Spark after the run to avoid memory pressure:
@@ -95,20 +98,23 @@ Bronze source files:
 s3://datalake-bronze/nyc-taxi/year=2023/month=01/yellow_tripdata_2023-01.parquet
 s3://datalake-bronze/nyc-taxi/year=2023/month=02/yellow_tripdata_2023-02.parquet
 s3://datalake-bronze/nyc-taxi/year=2023/month=03/yellow_tripdata_2023-03.parquet
+s3://datalake-bronze/nyc-taxi/year=2023/month=04/yellow_tripdata_2023-04.parquet
+s3://datalake-bronze/nyc-taxi/year=2023/month=05/yellow_tripdata_2023-05.parquet
+s3://datalake-bronze/nyc-taxi/year=2023/month=06/yellow_tripdata_2023-06.parquet
 ```
 
 Silver output:
 
 ```text
-s3://datalake-silver/nyc-taxi/year=scale/month=2023-01_2023-03_3files
+s3://datalake-silver/nyc-taxi/year=scale/month=2023-01_2023-06_6files
 ```
 
 Gold outputs:
 
 ```text
-s3://datalake-gold/daily_trip_metrics/year=scale/month=2023-01_2023-03_3files
-s3://datalake-gold/location_metrics/year=scale/month=2023-01_2023-03_3files
-s3://datalake-gold/payment_metrics/year=scale/month=2023-01_2023-03_3files
+s3://datalake-gold/daily_trip_metrics/year=scale/month=2023-01_2023-06_6files
+s3://datalake-gold/location_metrics/year=scale/month=2023-01_2023-06_6files
+s3://datalake-gold/payment_metrics/year=scale/month=2023-01_2023-06_6files
 ```
 
 ## Pipeline Results
@@ -117,39 +123,39 @@ Bronze to silver:
 
 | Metric | Value |
 |---|---:|
-| Source files | 3 |
-| Input rows | 9,384,487 |
-| Output rows | 9,300,691 |
-| Rejected rows | 83,796 |
-| Duration seconds | 821.846 |
+| Source files | 6 |
+| Input rows | 19,493,620 |
+| Output rows | 19,312,233 |
+| Rejected rows | 181,387 |
+| Duration seconds | 1,798.381 |
 
 Silver to gold:
 
 | Metric | Value |
 |---|---:|
-| Input rows | 9,300,691 |
-| Daily metric rows | 103 |
-| Location metric rows | 619,694 |
-| Payment metric rows | 472 |
-| Duration seconds | 1,066.387 |
+| Input rows | 19,312,233 |
+| Daily metric rows | 197 |
+| Location metric rows | 1,270,477 |
+| Payment metric rows | 931 |
+| Duration seconds | 2,151.675 |
 
 Spark SQL query smoke:
 
 | Query | Rows | Duration seconds |
 |---|---:|---:|
-| `01_daily_revenue` | 103 | 18.116 |
-| `02_top_pickup_locations` | 10 | 23.243 |
-| `03_avg_tip_by_payment` | 6 | 21.803 |
-| `04_hourly_distance_fare` | 24 | 75.994 |
-| `05_selective_pickup_date` | 1 | 0.887 |
-| `06_full_scan_location_aggregation` | 20 | 66.530 |
+| `01_daily_revenue` | 197 | 41.495 |
+| `02_top_pickup_locations` | 10 | 49.880 |
+| `03_avg_tip_by_payment` | 6 | 45.808 |
+| `04_hourly_distance_fare` | 24 | 154.685 |
+| `05_selective_pickup_date` | 1 | 0.971 |
+| `06_full_scan_location_aggregation` | 20 | 133.775 |
 
 Full local metrics were written under:
 
 ```text
-results-scale/nyc_taxi_bronze_to_silver/year=scale/month=2023-01_2023-03_3files/metrics.json
-results-scale/nyc_taxi_silver_to_gold/year=scale/month=2023-01_2023-03_3files/metrics.json
-results-scale/nyc_taxi_query_smoke/year=scale/month=2023-01_2023-03_3files/metrics.json
+results-scale/nyc_taxi_bronze_to_silver/year=scale/month=2023-01_2023-06_6files/metrics.json
+results-scale/nyc_taxi_silver_to_gold/year=scale/month=2023-01_2023-06_6files/metrics.json
+results-scale/nyc_taxi_query_smoke/year=scale/month=2023-01_2023-06_6files/metrics.json
 ```
 
 `results-scale/` is ignored to keep large local run artifacts out of Git.
@@ -171,17 +177,17 @@ The manifest reader now supports both:
 
 ## Path Toward 100 Million Rows
 
-The safe next step is to increase the file count gradually:
+The safe scale point for this laptop lab is the six-file run:
 
 | Target | Approximate size | Recommendation |
 |---|---:|---|
-| 3 files | 9.38M rows | Completed smoke-scale run |
-| 6-10 files | roughly 18M-35M rows | Good next laptop-scale target |
-| 20-30 files | roughly 60M-100M rows | Use only if host RAM/disk are stable |
+| 3 files | 9.38M rows | Completed initial smoke-scale run |
+| 6 files | 19.49M rows | Completed end-to-end scale run |
+| 16 files | 51.38M rows | Downloaded and uploaded to bronze, but Spark processing was not stable on the laptop |
+| 20-30 files | roughly 60M-100M rows | Keep as a script-supported target for larger hardware |
 
 For the final report, this is a stronger story than generating duplicate fake
 rows because the input is real public data with real schema and quality issues.
-If the laptop cannot process 100M rows safely, the project can still document
-that the downloader and manifest support the 30-file target while the executed
-validation was capped at a resource-safe size.
-
+The 16-file raw batch proves that Ceph RGW can hold a larger bronze dataset in
+this lab, while the six-file run is the largest completed end-to-end pipeline
+validation under the current memory constraints.

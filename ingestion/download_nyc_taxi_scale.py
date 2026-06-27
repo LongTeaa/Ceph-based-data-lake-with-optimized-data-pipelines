@@ -8,7 +8,6 @@ import hashlib
 import json
 import re
 import sys
-import tempfile
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -152,8 +151,9 @@ def download_file(url: str, destination: Path, force: bool) -> None:
         return
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(delete=False, dir=str(destination.parent)) as tmp:
-        tmp_path = Path(tmp.name)
+    tmp_path = destination.with_name(f".{destination.name}.download")
+    if tmp_path.exists():
+        tmp_path.unlink()
 
     try:
         print(f"downloading: {url}")
@@ -163,6 +163,8 @@ def download_file(url: str, destination: Path, force: bool) -> None:
                 if not chunk:
                     break
                 output.write(chunk)
+        if destination.exists():
+            destination.unlink()
         tmp_path.replace(destination)
         print(f"downloaded: {destination}")
     finally:

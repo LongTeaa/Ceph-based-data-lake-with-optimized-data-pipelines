@@ -422,7 +422,7 @@ The repo monitoring stack is mainly for the Docker-based application runtime. Ce
   <tr><td>Spark bronze-to-silver</td><td>Passed</td></tr>
   <tr><td>Spark silver-to-gold</td><td>Passed</td></tr>
   <tr><td>Spark SQL query smoke</td><td>Passed</td></tr>
-  <tr><td>NYC Taxi multi-file scale run</td><td>Passed with 3 real files, 9,384,487 input rows</td></tr>
+  <tr><td>NYC Taxi multi-file scale run</td><td>Passed with 6 real files, 19,493,620 input rows</td></tr>
   <tr><td>Trino gold query smoke</td><td>Passed</td></tr>
   <tr><td>Trino query during one-node outage</td><td>Passed</td></tr>
   <tr><td>Ceph recovery after node restart</td><td>Returned to <code>HEALTH_OK</code></td></tr>
